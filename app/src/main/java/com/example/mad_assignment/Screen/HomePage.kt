@@ -19,13 +19,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.mad_assignment.Data.Package
 import com.example.mad_assignment.R
 
 
 @Composable
-fun PackageCard(packageData: Package, modifier: Modifier = Modifier) {
+fun PackageCard(packageData: Package, modifier: Modifier = Modifier, navController: NavController) {
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
@@ -42,8 +43,8 @@ fun PackageCard(packageData: Package, modifier: Modifier = Modifier) {
 //                placeholder = painterResource(id = R.drawable.placeholder_background),
 //                error = painterResource(id = R.drawable.error_placeholder), // For when loading fails
 //                contentScale = ContentScale.Crop,
-//                modifier = Modifier.fillMaxSize()
 //            )
+//                modifier = Modifier.fillMaxSize()
 
             // 2. A gradient scrim for text readability
             Box(
@@ -96,19 +97,3 @@ fun PackageCard(packageData: Package, modifier: Modifier = Modifier) {
         }
     }
 }
-
-@Preview(showBackground = true)
-@Composable
-fun PackageCardPreview() {
-    val samplePackage = _root_ide_package_.com.example.mad_assignment.Data.Package(
-        packagesId = "p1",
-        packagesName = "Genting Highland",
-        review = 4.9,
-        imageUrl = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSKAYs_vpLM3So9qcw3Z80A0ubonxUhBQOCVg&s" // Preview will use the placeholder since the URL is empty
-    )
-    PackageCard(
-        packageData = samplePackage,
-        modifier = Modifier.size(width = 220.dp, height = 280.dp)
-    )
-}
-
