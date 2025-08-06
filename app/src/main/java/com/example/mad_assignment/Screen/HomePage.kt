@@ -34,6 +34,8 @@ fun PackageCard(packageData: Package, modifier: Modifier = Modifier) {
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
+
+
 //           AsyncImage(
 //                model = packageData.imageUrl, // Use the imageUrl from your data object
 //                contentDescription = "Image of ${packageData.packagesName}",
