@@ -1,4 +1,4 @@
-package com.example.mad_assignment.Screen
+package com.example.mad_assignment.ui.signin
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -18,8 +18,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -34,13 +32,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.layout.ModifierLocalBeyondBoundsLayout
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
 import com.example.mad_assignment.R
 
@@ -98,14 +94,7 @@ fun LoginPage(navController: NavController){
             singleLine = true,
             // This part handles the password visibility toggle
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-//            trailingIcon = {
-//                val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-//                val description = if (passwordVisible) "Hide password" else "Show password"
-//                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-//                    Icon(imageVector = image, description)
-//                }
-//            }
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
         )
 
         // 5. "Forgot Password" Link
