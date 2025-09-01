@@ -30,8 +30,6 @@ class PackageDetailViewModel @Inject constructor(
 
     private val _departures = MutableStateFlow<List<DepartureDate>>(emptyList())
     val departures: StateFlow<List<DepartureDate>> = _departures.asStateFlow()
-
-    // New state for the user's selected date
     private val _selectedDepartureId = MutableStateFlow<String?>(null)
     val selectedDepartureId: StateFlow<String?> = _selectedDepartureId.asStateFlow()
 
