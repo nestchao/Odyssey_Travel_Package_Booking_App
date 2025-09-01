@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.combine
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val travelPackageRepository: TravelPackageRepository
-): ViewModel() {
+) : ViewModel() {
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
@@ -25,21 +25,14 @@ class HomeViewModel @Inject constructor(
 
     private fun loadPackages() {
         viewModelScope.launch {
-            _uiState.value = HomeUiState.Loading
-
-            val featuredFlow = travelPackageRepository.getFeaturedPackages()
-            val allPackagesFlow = travelPackageRepository.getTravelPackages()
-
-            featuredFlow.combine(allPackagesFlow) { featuredList, allList ->
-                HomeUiState.Success(
-                    featuredPackages = featuredList,
-                    allPackages = allList
-                )
-            }.catch { exception ->
-                _uiState.value = HomeUiState.Error(exception.message ?: "An unknown error occurred")
-            }.collect { combinedSuccessState ->
-                _uiState.value = combinedSuccessState
-            }
+            travelPackageRepository.getTravelPackages()
+                .catch { exception ->
+                    _uiState.value = HomeUiState.Error(exception.message ?: "An unknown error occurred")
+                }
+                .collect { allPackages ->
+                    // The state now just holds the single list
+                    _uiState.value = HomeUiState.Success(allPackages)
+                }
         }
     }
 }
