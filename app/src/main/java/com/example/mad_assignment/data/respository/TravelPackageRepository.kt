@@ -2,6 +2,7 @@ package com.example.mad_assignment.data.respository
 
 import com.example.mad_assignment.data.datasource.TravelPackageDataSource
 import com.example.mad_assignment.data.model.TravelPackage
+import com.example.mad_assignment.data.model.Trip
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
@@ -24,8 +25,8 @@ class TravelPackageRepository @Inject constructor(
         travelPackageDataSource.delete(packageId)
     }
 
-    fun getFeaturedPackages(): Flow<List<TravelPackage>> {
-        return travelPackageDataSource.getFeaturedPackages()
+    suspend fun getTripsByIds(ids: List<String>): List<Trip> {
+        return travelPackageDataSource.getTripsByIds(ids)
     }
     fun getDepartureDates(packageId: String) = travelPackageDataSource.getDepartureDates(packageId)
 }
