@@ -10,6 +10,5 @@ data class TravelPackage(
     val pricing: Map<String, Double> = emptyMap(),
     val durationDays: Int = 0,
     val status: PackageStatus = PackageStatus.AVAILABLE, 
-    val itinerary: List<Trip> = emptyList(),
-    val isFeatured: Boolean = false
+    val itinerary: List<Trip> = emptyList()
 )
