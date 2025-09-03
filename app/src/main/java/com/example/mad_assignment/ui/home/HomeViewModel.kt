@@ -2,7 +2,7 @@ package com.example.mad_assignment.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.mad_assignment.data.respository.TravelPackageRepository
+import com.example.mad_assignment.data.repository.TravelPackageRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.catch
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlinx.coroutines.flow.combine
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(

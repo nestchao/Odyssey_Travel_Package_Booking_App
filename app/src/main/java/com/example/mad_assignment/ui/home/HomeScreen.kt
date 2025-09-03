@@ -166,7 +166,7 @@ fun EnhancedHomeContent(
         item {
             WelcomeSection()
         }
-        item {
+        item () {
             EnhancedAroundYouSection(
                 featuredPackages = packages.take(3),
                 onPackageClick = onPackageClick
@@ -182,7 +182,7 @@ fun EnhancedHomeContent(
                 onViewMoreClick = { /* TODO */ }
             )
         }
-        items(packages) { travelPackage ->
+        items(packages, key = {it.packageId}) { travelPackage ->
             EnhancedPackageCard(
                 packageData = travelPackage,
                 onClick = { onPackageClick(travelPackage.packageId) }
@@ -387,7 +387,6 @@ fun WelcomeSection() {
             modifier = Modifier
                 .padding(horizontal = 16.dp, vertical = 8.dp)
                 .clickable {
-                    // When clicked, launch the permission request
                     if (!locationPermissionsState.allPermissionsGranted) {
                         locationPermissionsState.launchMultiplePermissionRequest()
                     }
