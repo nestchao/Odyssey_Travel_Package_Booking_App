@@ -6,10 +6,9 @@ data class TravelPackage(
     @DocumentId val packageId: String = "",
     val packageName: String = "",
     val packageDescription: String = "",
-    val packageLocation: String = "",
     val imageUrls: List<String> = emptyList(),
-    val pricing: Map<String, Double> = emptyMap(),
+    val location: String = "",
     val durationDays: Int = 0,
-    val status: PackageStatus = PackageStatus.AVAILABLE,
-    val tripIds: List<String> = emptyList()
+    val pricing: Map<String, Double> = emptyMap(),
+    val itineraries: List<ItineraryItem> = emptyList()
 )

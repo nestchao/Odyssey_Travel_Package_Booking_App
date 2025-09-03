@@ -1,18 +1,14 @@
 package com.example.mad_assignment.ui.packagedetail
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.mad_assignment.data.model.TravelPackage
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -20,37 +16,43 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.mad_assignment.data.model.DepartureDate
-import com.google.firebase.Timestamp
-import androidx.compose.foundation.lazy.items
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.draw.shadow
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.ui.text.style.TextOverflow
-import kotlin.collections.firstOrNull
+import com.example.mad_assignment.data.model.TravelPackage
 import com.example.mad_assignment.data.model.Trip
+import com.google.firebase.Timestamp
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @Composable
 fun PackageDetailScreen(onNavigateBack: () -> Unit) {
     val viewModel: PackageDetailViewModel = hiltViewModel()
+    // We only need to collect the single uiState. All other data is inside it.
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val paxCounts by viewModel.paxCounts.collectAsStateWithLifecycle()
-    val departures by viewModel.departures.collectAsStateWithLifecycle()
-    val selectedDepartureId by viewModel.selectedDepartureId.collectAsStateWithLifecycle()
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)) {
             when (val state = uiState) {
                 is PackageDetailUiState.Loading -> {
                     Box(
@@ -75,7 +77,6 @@ fun PackageDetailScreen(onNavigateBack: () -> Unit) {
                 is PackageDetailUiState.Success -> {
                     val travelPackage = state.travelPackage
                     val actionBarHeight = 100.dp
-                    val itinerary = state.itinerary
 
                     LazyColumn(
                         modifier = Modifier
@@ -92,25 +93,28 @@ fun PackageDetailScreen(onNavigateBack: () -> Unit) {
                             PackageTitle(travelPackage)
                         }
                         item {
+                            // Access itineraryTrips from the state object
                             EnhancedPackageInfoBar(
                                 travelPackage = travelPackage,
-                                itinerary = itinerary
+                                itineraryTrips = state.itineraryTrips
                             )
                         }
                         item {
                             EnhancedDescriptionSection(travelPackage.packageDescription)
                         }
                         item {
+                            // Pass data from the state object and update the lambda
                             EnhancedDateSelector(
-                                departures = departures,
-                                selectedId = selectedDepartureId,
-                                onDateSelected = { id -> viewModel.selectDeparture(id) }
+                                departures = state.departures,
+                                selectedDeparture = state.selectedDeparture,
+                                onDateSelected = { departure -> viewModel.selectDeparture(departure) }
                             )
                         }
                         item {
+                            // Pass paxCounts from the state object
                             EnhancedPaxSelector(
                                 pricing = travelPackage.pricing,
-                                paxCounts = paxCounts,
+                                paxCounts = state.paxCounts,
                                 onPaxChanged = { category, change ->
                                     viewModel.updatePaxCount(category, change)
                                 }
@@ -119,15 +123,14 @@ fun PackageDetailScreen(onNavigateBack: () -> Unit) {
                         item {
                             EnhancedLocationSection()
                         }
-                        // Add some bottom padding
                         item {
                             Spacer(modifier = Modifier.height(24.dp))
                         }
                     }
 
+                    // Pass the entire success state to the action bar
                     EnhancedBookingActionBar(
-                        travelPackage = travelPackage,
-                        paxCounts = paxCounts,
+                        state = state,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding()
@@ -193,8 +196,8 @@ fun PackageTitle(travelPackage: TravelPackage) {
 @Composable
 fun EnhancedDateSelector(
     departures: List<DepartureDate>,
-    selectedId: String?,
-    onDateSelected: (String) -> Unit
+    selectedDeparture: DepartureDate?,
+    onDateSelected: (DepartureDate) -> Unit
 ) {
     Column(modifier = Modifier.padding(vertical = 16.dp)) {
         Row(
@@ -216,59 +219,69 @@ fun EnhancedDateSelector(
             )
         }
 
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(items = departures, key = { it.id }) { departure ->
-                val isSelected = departure.id == selectedId
-                val isSoldOut = departure.currentBookings >= departure.maxCapacity
+        if (departures.isEmpty()) {
+            Text(
+                text = "No departure dates available for this package.",
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(items = departures, key = { it.id }) { departure ->
+                    val isSelected = departure.id == selectedDeparture?.id
+                    val spotsLeft = departure.capacity // NOTE: This assumes capacity is spots left. You might need a more complex calculation.
+                    val isSoldOut = spotsLeft <= 0
 
-                val backgroundColor by animateColorAsState(
-                    targetValue = when {
-                        isSoldOut -> MaterialTheme.colorScheme.errorContainer
-                        isSelected -> MaterialTheme.colorScheme.primaryContainer
-                        else -> MaterialTheme.colorScheme.surface
-                    },
-                    animationSpec = tween(300), label = ""
-                )
+                    val backgroundColor by animateColorAsState(
+                        targetValue = when {
+                            isSoldOut -> MaterialTheme.colorScheme.errorContainer
+                            isSelected -> MaterialTheme.colorScheme.primaryContainer
+                            else -> MaterialTheme.colorScheme.surface
+                        },
+                        animationSpec = tween(300), label = ""
+                    )
 
-                val contentColor by animateColorAsState(
-                    targetValue = when {
-                        isSoldOut -> MaterialTheme.colorScheme.onErrorContainer
-                        isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
-                        else -> MaterialTheme.colorScheme.onSurface
-                    },
-                    animationSpec = tween(300), label = ""
-                )
+                    val contentColor by animateColorAsState(
+                        targetValue = when {
+                            isSoldOut -> MaterialTheme.colorScheme.onErrorContainer
+                            isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                            else -> MaterialTheme.colorScheme.onSurface
+                        },
+                        animationSpec = tween(300), label = ""
+                    )
 
-                Card(
-                    onClick = { if (!isSoldOut) onDateSelected(departure.id) },
-                    modifier = Modifier
-                        .width(140.dp)
-                        .shadow(if (isSelected) 8.dp else 2.dp, RoundedCornerShape(16.dp)),
-                    colors = CardDefaults.cardColors(containerColor = backgroundColor),
-                    border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-                    enabled = !isSoldOut
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    Card(
+                        onClick = { if (!isSoldOut) onDateSelected(departure) },
+                        modifier = Modifier
+                            .width(140.dp)
+                            .shadow(if (isSelected) 8.dp else 2.dp, RoundedCornerShape(16.dp)),
+                        colors = CardDefaults.cardColors(containerColor = backgroundColor),
+                        border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+                        enabled = !isSoldOut
                     ) {
-                        Text(
-                            text = formatDateRange(departure.startDate, departure.endDate),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = contentColor,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = if (isSoldOut) "Sold Out" else "${departure.maxCapacity - departure.currentBookings} spots left",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = contentColor.copy(alpha = 0.7f),
-                            textAlign = TextAlign.Center
-                        )
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = formatDate(departure.startDate),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = contentColor,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = if (isSoldOut) "Sold Out" else "$spotsLeft spots left",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = contentColor.copy(alpha = 0.7f),
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }
@@ -276,9 +289,9 @@ fun EnhancedDateSelector(
     }
 }
 
-private fun formatDateRange(start: Timestamp, end: Timestamp): String {
-    val sdf = java.text.SimpleDateFormat("dd MMM", java.util.Locale.getDefault())
-    return "${sdf.format(start.toDate())} - ${sdf.format(end.toDate())}"
+private fun formatDate(start: Timestamp): String {
+    val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+    return sdf.format(start.toDate())
 }
 
 @Composable
@@ -321,7 +334,7 @@ fun EnhancedDescriptionSection(description: String) {
 @Composable
 fun EnhancedPackageInfoBar(
     travelPackage: TravelPackage,
-    itinerary: List<Trip>
+    itineraryTrips: Map<Int, List<Trip>> // Use itineraryTrips to match the state
 ) {
     Card(
         modifier = Modifier
@@ -348,7 +361,7 @@ fun EnhancedPackageInfoBar(
             )
             EnhancedInfoColumn(
                 title = "LOCATION",
-                value = travelPackage.packageLocation ?: "N/A",
+                value = travelPackage.location,
                 icon = Icons.Outlined.LocationOn,
                 iconColor = MaterialTheme.colorScheme.error
             )
@@ -360,7 +373,7 @@ fun EnhancedPackageInfoBar(
 fun RowScope.EnhancedInfoColumn(
     title: String,
     value: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     iconColor: Color = MaterialTheme.colorScheme.primary
 ) {
     Column(
@@ -471,12 +484,11 @@ fun EnhancedImageHeader(travelPackage: TravelPackage, onNavigateBack: () -> Unit
         ) { page ->
             Box {
                 AsyncImage(
-                    model = travelPackage.imageUrls[page],
+                    model = travelPackage.imageUrls.getOrNull(page),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
-                // Gradient overlay for better text visibility
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -495,7 +507,6 @@ fun EnhancedImageHeader(travelPackage: TravelPackage, onNavigateBack: () -> Unit
             }
         }
 
-        // Top action bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -521,41 +532,15 @@ fun EnhancedImageHeader(travelPackage: TravelPackage, onNavigateBack: () -> Unit
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(
-                    onClick = { /* TODO: Share */ },
-                    shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.4f),
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Outlined.Share,
-                            contentDescription = "Share",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                Surface(onClick = { /* TODO: Share */ }, shape = CircleShape, color = Color.Black.copy(alpha = 0.4f), modifier = Modifier.size(48.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(24.dp)) }
                 }
-
-                Surface(
-                    onClick = { /* TODO: Favorite */ },
-                    shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.4f),
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Outlined.FavoriteBorder,
-                            contentDescription = "Favorite",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                Surface(onClick = { /* TODO: Favorite */ }, shape = CircleShape, color = Color.Black.copy(alpha = 0.4f), modifier = Modifier.size(48.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.FavoriteBorder, contentDescription = "Favorite", tint = Color.White, modifier = Modifier.size(24.dp)) }
                 }
             }
         }
 
-        // Page indicators
         if (pagerState.pageCount > 1) {
             Row(
                 Modifier
@@ -609,9 +594,7 @@ fun EnhancedPaxSelector(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
@@ -683,7 +666,7 @@ fun EnhancedPaxRow(
             Surface(
                 shape = RoundedCornerShape(8.dp),
                 color = MaterialTheme.colorScheme.secondaryContainer,
-                modifier = Modifier.width(50.dp).padding(vertical = 8.dp)
+                modifier = Modifier.width(50.dp)
             ) {
                 Text(
                     text = "$count",
@@ -691,7 +674,7 @@ fun EnhancedPaxRow(
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.padding(8.dp)
+                    modifier = Modifier.padding(vertical = 8.dp)
                 )
             }
 
@@ -716,20 +699,12 @@ fun EnhancedPaxRow(
 
 @Composable
 fun EnhancedBookingActionBar(
-    travelPackage: TravelPackage,
-    paxCounts: Map<String, Int>,
+    state: PackageDetailUiState.Success, // Receive the whole state
     modifier: Modifier = Modifier
 ) {
-    val totalPrice by remember(paxCounts) {
-        derivedStateOf {
-            paxCounts.entries.sumOf { (category, count) ->
-                (travelPackage.pricing[category] ?: 0.0) * count
-            }
-        }
-    }
-
-    val totalPax = paxCounts.values.sum()
-    val hasSelection = totalPax > 0
+    val totalPrice = state.totalPrice // Use the helper property from the state class
+    val totalPax = state.paxCounts.values.sum()
+    val hasSelection = totalPax > 0 && state.selectedDeparture != null
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -738,7 +713,6 @@ fun EnhancedBookingActionBar(
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
         Column {
-            // Price summary section
             if (hasSelection) {
                 Row(
                     modifier = Modifier
@@ -760,7 +734,6 @@ fun EnhancedBookingActionBar(
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
-
                     Text(
                         text = "View breakdown",
                         style = MaterialTheme.typography.bodySmall,
@@ -771,7 +744,6 @@ fun EnhancedBookingActionBar(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
             }
 
-            // Action buttons
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -786,58 +758,35 @@ fun EnhancedBookingActionBar(
                         border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(16.dp)
                     ) {
-                        Icon(
-                            Icons.Outlined.ShoppingCart,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Icon(Icons.Outlined.ShoppingCart, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            "Add to Cart",
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Text("Add to Cart", fontWeight = FontWeight.SemiBold)
                     }
 
                     Button(
                         onClick = { /* TODO: Book now */ },
                         modifier = Modifier.weight(1f).height(56.dp),
                         shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
-                        Icon(
-                            Icons.Outlined.EventAvailable,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Icon(Icons.Outlined.EventAvailable, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            "Book Now",
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text("Book Now", fontWeight = FontWeight.Bold)
                     }
                 } else {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        ),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Row(
                             modifier = Modifier.padding(20.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                Icons.Outlined.Info,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(24.dp)
-                            )
+                            Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                text = "Please select dates and number of travelers to continue",
+                                text = "Please select dates and travelers to continue",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
