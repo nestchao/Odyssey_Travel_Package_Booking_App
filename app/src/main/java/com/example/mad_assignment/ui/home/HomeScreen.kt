@@ -49,10 +49,13 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.android.gms.location.LocationServices
 import java.util.Locale
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.navigation.compose.rememberNavController
+import com.example.mad_assignment.ui.notifications.NotificationsScreen
 
 @Composable
 fun HomeScreen(
-    onPackageClick: (String) -> Unit
+    onPackageClick: (String) -> Unit,
+    onBellClick: (String) -> Unit
 ) {
     val viewModel: HomeViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -75,7 +78,8 @@ fun HomeScreen(
                 is HomeUiState.Success -> {
                     EnhancedHomeContent(
                         packages = state.packages,
-                        onPackageClick = onPackageClick
+                        onPackageClick = onPackageClick,
+                        onBellClick = onBellClick
                     )
                 }
                 is HomeUiState.Error -> {
@@ -154,14 +158,15 @@ fun EnhancedErrorState(message: String) {
 @Composable
 fun EnhancedHomeContent(
     packages: List<TravelPackage>,
-    onPackageClick: (String) -> Unit
+    onPackageClick: (String) -> Unit,
+    onBellClick: (String) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
-            EnhancedHomeHeader()
+            EnhancedHomeHeader(onBellClick)
         }
         item {
             WelcomeSection()
@@ -195,7 +200,9 @@ fun EnhancedHomeContent(
 }
 
 @Composable
-fun EnhancedHomeHeader() {
+fun EnhancedHomeHeader(
+    onBellClick: (String) -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -251,7 +258,7 @@ fun EnhancedHomeHeader() {
                     }
 
                     Surface(
-                        onClick = { /* TODO: Notifications */ },
+                        onClick = { onBellClick("notifications") },
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surface,
                         modifier = Modifier.size(48.dp)

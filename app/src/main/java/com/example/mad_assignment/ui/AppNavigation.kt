@@ -8,6 +8,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.mad_assignment.ui.home.HomeScreen
+import com.example.mad_assignment.ui.notifications.NotificationsScreen
 import com.example.mad_assignment.ui.packagedetail.PackageDetailScreen
 
 @Composable
@@ -18,6 +19,9 @@ fun AppNavigation(){
             HomeScreen(
                 onPackageClick = { packageId ->
                     navController.navigate("detail/$packageId")
+                },
+                onBellClick = {
+                    navController.navigate("notifications")
                 }
             )
         }
@@ -29,6 +33,10 @@ fun AppNavigation(){
                 onNavigateBack = { navController.popBackStack() }
             )
         }
-
+        composable("notifications") {
+            NotificationsScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
     }
 }
