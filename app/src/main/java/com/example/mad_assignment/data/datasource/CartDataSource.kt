@@ -1,16 +1,15 @@
 package com.example.mad_assignment.data.datasource
 
+import android.util.Log
 import com.example.mad_assignment.data.model.Cart
 import com.example.mad_assignment.data.model.CartItem
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.snapshots
 import com.google.firebase.firestore.toObjects
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import com.google.firebase.Timestamp
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
-import com.google.firebase.firestore.FieldPath
 
 @Singleton
 class CartDataSource @Inject constructor(
@@ -19,21 +18,79 @@ class CartDataSource @Inject constructor(
     companion object {
         private const val CARTS_COLLECTION = "carts"
         private const val CART_ITEMS_COLLECTION = "cartItems"
+        private const val TAG = "CartDataSource"
     }
 
-    fun getCartByUserId(userId: String): Flow<Cart?> {
-        return firestore.collection(CARTS_COLLECTION)
-            .whereEqualTo("userId", userId)
-            .snapshots()
-            .map { snapshot ->
-                snapshot.toObjects<Cart>().firstOrNull()
-            }
+    suspend fun createCart(newCart: Cart): Result<String> {
+        return try {
+            val documentRef = firestore.collection(CARTS_COLLECTION).add(newCart).await()
+            Result.success(documentRef.id)
+        } catch (e: Exception) {
+            Log.e(TAG, "createCart failed", e)
+            Result.failure(RuntimeException("Failed to create new cart", e))
+        }
+    }
+
+    // delete cart with the cart items inside of it
+    suspend fun deleteCart(cartId: String): Result<Unit> {
+        return try {
+            firestore.runTransaction { transaction ->
+                val cartRef = firestore.collection(CARTS_COLLECTION).document(cartId)
+                val cartSnapshot = transaction.get(cartRef)
+                val cart = cartSnapshot.toObject(Cart::class.java)
+                    ?: throw Exception("Cart not found.")
+
+                for (itemId in cart.cartItemIds) {
+                    val itemRef = firestore.collection(CART_ITEMS_COLLECTION).document(itemId)
+                    transaction.delete(itemRef)
+                }
+
+                transaction.delete(cartRef)
+            }.await().let { Result.success(Unit) }
+        } catch (e: Exception) {
+            Log.e(TAG, "deleteCart failed", e)
+            Result.failure(RuntimeException("Failed to delete cart and its items", e))
+        }
+    }
+
+    suspend fun getCartById(cartId: String): Result<Cart?> {
+        return try {
+            val document = firestore.collection(CARTS_COLLECTION).document(cartId).get().await()
+            val cart = document.toObject(Cart::class.java)
+            Result.success(cart)
+        } catch (e: Exception) {
+            Log.e(TAG, "getCartById failed", e)
+            Result.failure(RuntimeException("Failed to get cart by cart id", e))
+        }
+    }
+
+    suspend fun getCartItemById(cartItemId: String): Result<CartItem?> {
+        return try {
+            val document = firestore.collection(CART_ITEMS_COLLECTION).document(cartItemId).get().await()
+            val cartItem = document.toObject(CartItem::class.java)
+            Result.success(cartItem)
+        } catch (e: Exception) {
+            Log.e(TAG, "getCartItemById failed", e)
+            Result.failure(RuntimeException("Failed to get cart item by card id", e))
+        }
+    }
+
+    suspend fun getCartByUserId(userId: String): Result<Cart?> {
+        return try {
+            val snapshot = firestore.collection(CARTS_COLLECTION)
+                .whereEqualTo("userId", userId)
+                .get()
+                .await()
+            val cart = snapshot.toObjects(Cart::class.java).firstOrNull()
+            Result.success(cart)
+        } catch (e: Exception) {
+            Log.e(TAG, "getCartByUserId failed", e)
+            Result.failure(RuntimeException("Failed to get cart by user id", e))
+        }
     }
 
     suspend fun getCartItemsForCart(cartItemIds: List<String>): Result<List<CartItem>> {
-        if (cartItemIds.isEmpty()) {
-            return Result.success(emptyList())
-        }
+        if (cartItemIds.isEmpty()) return Result.success(emptyList())
         return try {
             val snapshot = firestore.collection(CART_ITEMS_COLLECTION)
                 .whereIn(FieldPath.documentId(), cartItemIds)
@@ -41,46 +98,49 @@ class CartDataSource @Inject constructor(
                 .await()
             Result.success(snapshot.toObjects())
         } catch (e: Exception) {
-            Result.failure(e)
+            Log.e(TAG, "getCartItemsForCart failed", e)
+            Result.failure(RuntimeException("Failed to fetch cart items", e))
         }
     }
 
     suspend fun addItemToCart(userId: String, cartId: String?, newCartItem: CartItem): Result<String> {
         return try {
             firestore.runTransaction { transaction ->
-                val cartRef = if (cartId.isNullOrEmpty()) {
-                    firestore.collection(CARTS_COLLECTION).document()
+                val finalCartId = cartId ?: firestore.collection(CARTS_COLLECTION).document().id
+                val cartRef = firestore.collection(CARTS_COLLECTION).document(finalCartId)
+
+                val existingCart: Cart? = if (cartId != null) {
+                    val cartSnapshot = transaction.get(cartRef)
+                    cartSnapshot.toObject(Cart::class.java)
                 } else {
-                    firestore.collection(CARTS_COLLECTION).document(cartId)
+                    null // new cart
                 }
 
-                val cartSnapshot = transaction.get(cartRef)
-                val existingCart = cartSnapshot.toObject(Cart::class.java)
-
-                // Add the new cart item and get its ID
                 val newCartItemRef = firestore.collection(CART_ITEMS_COLLECTION).document()
-                transaction.set(newCartItemRef, newCartItem.copy(cartItemId = newCartItemRef.id))
+                val updatedCartItem = newCartItem.copy(cartItemId = newCartItemRef.id, updatedAt = Timestamp.now())
+                transaction.set(newCartItemRef, updatedCartItem)
 
-                // Update or create the cart document
-                val updatedItemIds = existingCart?.cartItemIds?.plus(newCartItemRef.id) ?: listOf(newCartItemRef.id)
-                val updatedTotalAmount = (existingCart?.totalAmount ?: 0.0) + newCartItem.totalPrice
+                val updatedItemIds = existingCart?.cartItemIds?.plus(newCartItemRef.id)
+                    ?: listOf(newCartItemRef.id)
+                val updatedTotalAmount = (existingCart?.totalAmount ?: 0.0) + updatedCartItem.totalPrice
 
                 val cartData = Cart(
-                    cartId = cartRef.id,
+                    cartId = finalCartId,
                     userId = userId,
                     cartItemIds = updatedItemIds,
                     totalAmount = updatedTotalAmount,
                     finalAmount = updatedTotalAmount,
-                    createdAt = existingCart?.createdAt ?: newCartItem.addedAt,
-                    updatedAt = newCartItem.addedAt,
-                    isValid = true
+                    createdAt = existingCart?.createdAt ?: Timestamp.now(),
+                    updatedAt = Timestamp.now(),
+                    isValid = false // need to check cart valid or not again
                 )
                 transaction.set(cartRef, cartData)
 
                 newCartItemRef.id
-            }.await().let { Result.success(it) }
+            }.await().let { newItemId -> Result.success(newItemId) }
         } catch (e: Exception) {
-            Result.failure(e)
+            Log.e(TAG, "addItemToCart failed for userId: $userId, cartId: $cartId", e)
+            Result.failure(RuntimeException("Failed to add item to cart", e))
         }
     }
 
@@ -95,21 +155,80 @@ class CartDataSource @Inject constructor(
                 val cartItemSnapshot = transaction.get(cartItemRef)
                 val cartItem = cartItemSnapshot.toObject(CartItem::class.java)
 
-                if (cart == null || cartItem == null) {
-                    throw Exception("Cart or CartItem not found.")
+                if (cart == null) {
+                    throw Exception("Cart: $cartId not found.")
                 }
 
-                // remove the item from the cart item list and update the total
+                if (cartItem == null) {
+                    throw Exception("CartItem: $cartItemIdToRemove not found.")
+                }
+
                 val updatedItemIds = cart.cartItemIds.filter { it != cartItemIdToRemove }
                 val updatedTotalAmount = cart.totalAmount - cartItem.totalPrice
 
-                transaction.update(cartRef, "cartItemIds", updatedItemIds, "totalAmount", updatedTotalAmount, "finalAmount", updatedTotalAmount)
+                transaction.update(
+                    cartRef,
+                    "cartItemIds", updatedItemIds,
+                    "totalAmount", updatedTotalAmount,
+                    "finalAmount", updatedTotalAmount,
+                    "updatedAt", Timestamp.now(),
+                    "isValid", false
+                )
                 transaction.delete(cartItemRef)
             }.await().let { Result.success(Unit) }
         } catch (e: Exception) {
-            Result.failure(e)
+            Log.e(TAG, "removeItemFromCart failed", e)
+            Result.failure(RuntimeException("Failed to remove item from cart", e))
         }
     }
+
+    // always update to validate cart
+    suspend fun updateCart(cartId: String): Result<Unit> {
+        return try {
+            val cartRef = firestore.collection(CARTS_COLLECTION).document(cartId)
+            val cartSnapshot = cartRef.get().await()
+            val cart = cartSnapshot.toObject(Cart::class.java)
+                ?: throw Exception("Cart not found.")
+
+            if (cart.cartItemIds.isEmpty()) {
+                firestore.runTransaction { transaction ->
+                    transaction.update(
+                        cartRef,
+                        "totalAmount", 0.0,
+                        "finalAmount", 0.0,
+                        "updatedAt", Timestamp.now(),
+                        "isValid", false
+                    )
+                }.await()
+                return Result.success(Unit)
+            }
+
+            val cartItemsSnapshot = firestore.collection(CART_ITEMS_COLLECTION)
+                .whereIn(FieldPath.documentId(), cart.cartItemIds)
+                .get()
+                .await()
+
+            val newTotalAmount = cartItemsSnapshot
+                .toObjects<CartItem>()
+                .sumOf { it.totalPrice }
+
+            firestore.runTransaction { transaction ->
+                transaction.update(
+                    cartRef,
+                    "totalAmount", newTotalAmount,
+                    "finalAmount", newTotalAmount,
+                    "updatedAt", Timestamp.now(),
+                    "isValid", true
+                )
+            }.await()
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "updateCart failed", e)
+            Result.failure(RuntimeException("Failed to update cart totals", e))
+        }
+    }
+
 
     suspend fun updateCartItemInCart(cartId: String, updatedCartItem: CartItem): Result<Unit> {
         return try {
@@ -122,20 +241,27 @@ class CartDataSource @Inject constructor(
                 val oldCartItemSnapshot = transaction.get(cartItemRef)
                 val oldCartItem = oldCartItemSnapshot.toObject(CartItem::class.java)
 
-                if (cart == null || oldCartItem == null) {
-                    throw Exception("Cart or CartItem not found.")
+                if (cart == null) {
+                    throw Exception("Cart not found.")
                 }
 
-                // update the total amount on the cart document
-                val newTotalPrice = updatedCartItem.totalPrice
-                val oldTotalPrice = oldCartItem.totalPrice
-                val updatedTotalAmount = cart.totalAmount - oldTotalPrice + newTotalPrice
+                if (oldCartItem == null) {
+                    throw Exception("Old CartItem not found.")
+                }
+
+                val updatedTotalAmount = cart.totalAmount - oldCartItem.totalPrice + updatedCartItem.totalPrice
 
                 transaction.set(cartItemRef, updatedCartItem)
-                transaction.update(cartRef, "totalAmount", updatedTotalAmount, "finalAmount", updatedTotalAmount)
+                transaction.update(cartRef,
+                    "totalAmount", updatedTotalAmount,
+                    "finalAmount", updatedTotalAmount,
+                    "updatedAt", Timestamp.now(),
+                    "isValid", false
+                )
             }.await().let { Result.success(Unit) }
         } catch (e: Exception) {
-            Result.failure(e)
+            Log.e(TAG, "updateCartItemInCart failed", e)
+            Result.failure(RuntimeException("Failed to update cart item", e))
         }
     }
 
@@ -144,19 +270,26 @@ class CartDataSource @Inject constructor(
             firestore.runTransaction { transaction ->
                 val cartRef = firestore.collection(CARTS_COLLECTION).document(cartId)
                 val cartSnapshot = transaction.get(cartRef)
-                cartSnapshot.toObject(Cart::class.java) ?: throw Exception("Cart not found.")
+                cartSnapshot.toObject(Cart::class.java)
+                    ?: throw Exception("Cart not found.")
 
-                // delete all cart items
                 for (itemId in cartItemIds) {
                     val itemRef = firestore.collection(CART_ITEMS_COLLECTION).document(itemId)
                     transaction.delete(itemRef)
                 }
 
-                // update the cart document
-                transaction.update(cartRef, "cartItemIds", emptyList<String>(), "totalAmount", 0.0, "finalAmount", 0.0)
+                transaction.update(
+                    cartRef,
+                    "cartItemIds", emptyList<String>(),
+                    "totalAmount", 0.0,
+                    "finalAmount", 0.0,
+                    "updatedAt", Timestamp.now(),
+                    "isValid", false
+                )
             }.await().let { Result.success(Unit) }
         } catch (e: Exception) {
-            Result.failure(e)
+            Log.e(TAG, "clearCart failed", e)
+            Result.failure(RuntimeException("Failed to clear cart", e))
         }
     }
 }

@@ -1,7 +1,7 @@
 package com.example.mad_assignment.data.model
 
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentId
-import java.time.LocalDateTime
 
 data class Cart(
     @DocumentId val cartId: String = "",
@@ -9,7 +9,7 @@ data class Cart(
     val cartItemIds: List<String> = emptyList(),
     val totalAmount: Double = 0.0,
     val finalAmount: Double = 0.0,
-    val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime,
-    val isValid: Boolean = true // invalid if user cancel booking or something happened - logic problem
+    val createdAt: Timestamp? = null,
+    val updatedAt: Timestamp? = null,
+    val isValid: Boolean = false // invalid if user cancel booking or something happened - logic problem
 )
