@@ -1,25 +1,10 @@
 package com.example.mad_assignment.ui.notifications
 
-import com.google.type.Date
-import java.sql.Time
+import com.example.mad_assignment.data.model.Notification
 
 sealed interface NotificationsUiState {
-
-    enum class Status {
-        Archived,
-        Unread,
-        Deleted,
-        Read
-    }
-
-    data class Notification(
-        val id: String,
-        val title: String,
-        val message: String,
-        val date: Date, // if today, show hours/min passed else show days
-        val time: Time,
-        var status: Status
-    ) : NotificationsUiState {
-
-    }
+    object Loading : NotificationsUiState
+    object Empty : NotificationsUiState
+    data class Success(val notifications: List<Notification>) : NotificationsUiState
+    data class Error(val message: String) : NotificationsUiState
 }

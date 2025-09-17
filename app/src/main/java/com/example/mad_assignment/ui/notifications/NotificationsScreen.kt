@@ -1,19 +1,22 @@
 package com.example.mad_assignment.ui.notifications
 
-import android.R.attr.shape
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,6 +26,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.MarkChatUnread
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -35,8 +40,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -45,13 +52,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.mad_assignment.data.model.Notification
+import com.example.mad_assignment.data.respository.NotificationRepository
 
 @Composable
 fun NotificationsScreen(
     onNavigateBack: () -> Unit,
+    onNotificationClick: (notificationId: String) -> Unit,
+    viewModel: NotificationsViewModel = viewModel(
+        factory = NotificationsViewModelFactory(NotificationRepository())
+    ),
     modifier: Modifier = Modifier
         .safeDrawingPadding()
         .fillMaxSize()
@@ -63,15 +78,15 @@ fun NotificationsScreen(
         Column(
             modifier = modifier
         ) {
-            Header(onNavigateBack)
-            OptionDropdownMenu()
-            ShowNotifications()
+            NotificationScreenHeader(onNavigateBack = onNavigateBack)
+            OptionDropdownMenu(viewModel = viewModel)
+            ShowNotifications(viewModel = viewModel, onNotificationClick = onNotificationClick)
         }
     }
 }
 
 @Composable
-fun Header(
+fun NotificationScreenHeader(
     onNavigateBack: () -> Unit
 ) {
     Box(
@@ -104,38 +119,20 @@ fun Header(
         )
     }
 }
-
-data class NotificationItem(
-    val id: Int,
-    val title: String,
-    val message: String,
-    val time: String, // e.g., "2 hours ago"
-    val isRead: Boolean
-) // implement in view model/ui state
-
 @Composable
-fun ShowNotifications(modifier: Modifier = Modifier) {
-    val notifications = listOf(
-        NotificationItem(1, "New Message", "You have a new message from John Doe.", "5 minutes ago", false),
-        NotificationItem(2, "Order Shipped", "Your order #12345 has been shipped!", "1 hour ago", true),
-        NotificationItem(3, "Promotion Alert", "Don't miss out on our summer sale!", "3 hours ago", false),
-        NotificationItem(4, "Reminder", "Meeting with team at 2 PM today.", "Yesterday", false),
-        NotificationItem(5, "App Update", "A new version of the app is available.", "2 days ago", false),
-        NotificationItem(6, "Security Alert", "Unusual login activity detected.", "3 days ago", true),
-        NotificationItem(1, "New Message", "You have a new message from John Doe.", "5 minutes ago", true),
-        NotificationItem(2, "Order Shipped", "Your order #12345 has been shipped!", "1 hour ago", false),
-        NotificationItem(3, "Promotion Alert", "Don't miss out on our summer sale!", "3 hours ago", false),
-        NotificationItem(4, "Reminder", "Meeting with team at 2 PM today.", "Yesterday", false),
-        NotificationItem(5, "App Update", "A new version of the app is available.", "2 days ago", false),
-        NotificationItem(6, "Security Alert", "Unusual login activity detected.", "3 days ago", false)
-    )
+fun ShowNotifications(
+    viewModel: NotificationsViewModel,
+    onNotificationClick: (notificationId: String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val notifications by viewModel.notifications.collectAsState()
 
     if (notifications.isEmpty()) {
         Box(
             modifier = modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = "No new notifications", style = MaterialTheme.typography.bodyLarge)
+            Text(text = "No notifications", style = MaterialTheme.typography.bodyLarge)
         }
     } else {
         LazyColumn(
@@ -145,20 +142,26 @@ fun ShowNotifications(modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(notifications) { notification ->
-                NotificationCard(notification = notification)
+                NotificationCard(
+                    notification = notification,
+                    onNotificationClick = onNotificationClick
+                )
             }
         }
     }
 }
 
 @Composable
-fun OptionDropdownMenu() {
+fun OptionDropdownMenu(
+    viewModel: NotificationsViewModel
+) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     val items = listOf(
-        "All" to Icons.Default.Notifications,
-        "Archived" to Icons.Default.Archive,
+        NotificationFilter.ALL to Icons.Default.Notifications,
+        NotificationFilter.UNREAD to Icons.Default.MarkChatUnread,
+        NotificationFilter.ARCHIVED to Icons.Default.Archive,
     )
-    var selectedItem by rememberSaveable { mutableStateOf(items[0].first) }
+    var selectedItem by rememberSaveable { mutableStateOf(items[0].first.displayName) }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -203,7 +206,7 @@ fun OptionDropdownMenu() {
                     DropdownMenuItem(
                         text = {
                             Text(
-                                text = label,
+                                text = label.displayName,
                                 modifier = Modifier
                                     .padding(horizontal = 10.dp, vertical = 5.dp)
                             )
@@ -215,8 +218,9 @@ fun OptionDropdownMenu() {
                             )
                         },
                         onClick = {
-                            selectedItem = label
+                            selectedItem = label.displayName
                             expanded = false
+                            viewModel.setFilter(label)
                         }
                     )
                 }
@@ -226,7 +230,10 @@ fun OptionDropdownMenu() {
 }
 
 @Composable
-fun NotificationCard(notification: NotificationItem) {
+fun NotificationCard(
+    notification: Notification,
+    onNotificationClick: (notificationId: String) -> Unit
+) {
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier
@@ -240,7 +247,8 @@ fun NotificationCard(notification: NotificationItem) {
         colors = CardDefaults.cardColors(
             containerColor = Color.White, // MaterialTheme.colorScheme.onSurface,
             contentColor = Color.Black // MaterialTheme.colorScheme.onSurface
-        )
+        ),
+        onClick = { onNotificationClick(notification.id) }
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
@@ -251,7 +259,7 @@ fun NotificationCard(notification: NotificationItem) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (!notification.isRead) {
+                    if (notification.status == Notification.Status.UNREAD) {
                         Surface(
                             shape = CircleShape,
                             color = Color.Red,
@@ -263,17 +271,17 @@ fun NotificationCard(notification: NotificationItem) {
                         text = notification.title,
                         fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.titleMedium,
-                        modifier = if (!notification.isRead) Modifier.padding(start = 10.dp) else Modifier.padding(start = 0.dp)
+                        modifier = if (notification.status == Notification.Status.UNREAD) Modifier.padding(start = 10.dp) else Modifier.padding(start = 0.dp)
                     )
                 }
                 Text(
-                    text = notification.time,
+                    text = notification.getFormattedTime(),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray
                 )
             }
             Text(
-                text = notification.message,
+                text = notification.message.take(40) + if(notification.message.length > 40) "..." else "",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 4.dp)
             )

@@ -8,6 +8,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.mad_assignment.ui.home.HomeScreen
+import com.example.mad_assignment.ui.notifications.NotificationDetailsScreen
 import com.example.mad_assignment.ui.notifications.NotificationsScreen
 import com.example.mad_assignment.ui.packagedetail.PackageDetailScreen
 
@@ -35,6 +36,16 @@ fun AppNavigation(){
         }
         composable("notifications") {
             NotificationsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNotificationClick = { notificationId ->
+                    navController.navigate("notificationDetail/$notificationId")
+                }
+            )
+        }
+        composable("notificationDetail/{id}") { backStackEntry ->
+            val id = backStackEntry.arguments?.getString("id") ?: return@composable
+            NotificationDetailsScreen(
+                notificationId = id,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

@@ -49,8 +49,12 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.android.gms.location.LocationServices
 import java.util.Locale
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.rememberNavController
+import com.example.mad_assignment.data.respository.NotificationRepository
 import com.example.mad_assignment.ui.notifications.NotificationsScreen
+import com.example.mad_assignment.ui.notifications.NotificationsViewModel
+import com.example.mad_assignment.ui.notifications.NotificationsViewModelFactory
 
 @Composable
 fun HomeScreen(
@@ -257,6 +261,11 @@ fun EnhancedHomeHeader(
                         }
                     }
 
+                    val notificationViewModel: NotificationsViewModel = viewModel(
+                        factory = NotificationsViewModelFactory(NotificationRepository())
+                    )
+                    val unreadCount by notificationViewModel.unreadCount.collectAsState()
+
                     Surface(
                         onClick = { onBellClick("notifications") },
                         shape = CircleShape,
@@ -266,10 +275,15 @@ fun EnhancedHomeHeader(
                         Box(contentAlignment = Alignment.Center) {
                             BadgedBox(
                                 badge = {
-                                    Badge(
-                                        containerColor = MaterialTheme.colorScheme.primary
-                                    ) {
-                                        Text("3", style = MaterialTheme.typography.labelSmall)
+                                    if (unreadCount > 0) { // 👈 only show when there are unread
+                                        Badge(
+                                            containerColor = MaterialTheme.colorScheme.primary
+                                        ) {
+                                            Text(
+                                                unreadCount.toString(),
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        }
                                     }
                                 }
                             ) {
