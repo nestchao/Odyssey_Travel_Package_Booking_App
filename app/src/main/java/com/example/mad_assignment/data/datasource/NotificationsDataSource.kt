@@ -162,6 +162,31 @@ class NotificationsDataSource @Inject constructor(
     }
 
     /**
+     * Get a specific notification by ID for a user
+     */
+    fun getNotificationById(userId: String, id: String): Flow<Notification?> {
+        return callbackFlow {
+            val listenerRegistration = firestore
+                .collection(USERS_COLLECTION)
+                .document(userId)
+                .collection(USER_NOTIFICATIONS_SUBCOLLECTION)
+                .document(id)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        close(error)
+                        return@addSnapshotListener
+                    }
+                    val notification = snapshot?.toObject(FirestoreNotification::class.java)?.toNotification()
+                    trySend(notification)
+                }
+
+            awaitClose {
+                listenerRegistration.remove()
+            }
+        }
+    }
+
+    /**
      * Add a new notification for a user
      */
     suspend fun addNotification(notification: Notification, userId: String): Result<String> {

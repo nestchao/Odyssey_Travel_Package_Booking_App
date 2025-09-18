@@ -1,29 +1,40 @@
 package com.example.mad_assignment.ui.notifications
 
+import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -31,6 +42,8 @@ import com.example.mad_assignment.data.datasource.NotificationsDataSource
 import com.example.mad_assignment.data.model.Notification
 import com.example.mad_assignment.data.respository.NotificationRepository
 import com.google.firebase.firestore.FirebaseFirestore
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @Composable
 fun NotificationDetailsScreen(
@@ -43,18 +56,19 @@ fun NotificationDetailsScreen(
         .safeDrawingPadding()
         .fillMaxSize()
 ) {
-    val notifications by viewModel.notifications.collectAsState()
-    val notification = notifications.find { it.id == notificationId }
+    val notification by viewModel.getNotificationById(notificationId).collectAsState(initial = null)
 
-    viewModel.markAsRead(id = notificationId)
+    if(notification?.status == Notification.Status.UNREAD)
+        viewModel.markAsRead(id = notificationId)
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         Column(
-            modifier = modifier,
+            modifier = modifier.padding(end = 10.dp),
         ) {
-            ShowNotificationDetails(notification = notification, onNavigateBack = onNavigateBack, modifier)
+            ShowNotificationDetails(notification = notification, onNavigateBack = onNavigateBack, viewModel, modifier)
         }
     }
 }
@@ -63,6 +77,7 @@ fun NotificationDetailsScreen(
 fun ShowNotificationDetails(
     notification: Notification?,
     onNavigateBack: () -> Unit,
+    viewModel: NotificationsViewModel,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -70,7 +85,7 @@ fun ShowNotificationDetails(
         color = MaterialTheme.colorScheme.background
     ) {
         Box {
-            DetailScreenHeader(onNavigateBack = onNavigateBack)
+            DetailScreenHeader(onNavigateBack = onNavigateBack, viewModel, notification)
 
             if (notification != null) {
                 LazyColumn(
@@ -80,17 +95,21 @@ fun ShowNotificationDetails(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item {
+                        val formatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                        val formattedTime = formatter.format(notification.timestamp)
+
                         Text(
-                            text = notification.title,
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold
+                            text = formattedTime,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
                         )
                     }
                     item {
                         Text(
-                            text = "Sent " + notification.getFormattedTime(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray
+                            text = notification.title,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 10.dp)
                         )
                     }
                     item {
@@ -114,8 +133,12 @@ fun ShowNotificationDetails(
 
 @Composable
 fun DetailScreenHeader(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    viewModel: NotificationsViewModel,
+    notification: Notification?
 ) {
+    val context = LocalContext.current
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -135,6 +158,50 @@ fun DetailScreenHeader(
                     tint = MaterialTheme.colorScheme.onSurface, // white
                     modifier = Modifier.size(24.dp)
                 )
+            }
+        }
+        if(notification != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(
+                    onClick = {
+                        if(notification.status == Notification.Status.ARCHIVED) {
+                            viewModel.markAsRead(notification.id)
+                            Toast.makeText(context, "Notification unarchived", Toast.LENGTH_SHORT).show()
+                        }
+                        else if(notification.status == Notification.Status.READ) {
+                            viewModel.markAsArchived(notification.id)
+                            Toast.makeText(context, "Notification archived", Toast.LENGTH_SHORT).show()
+                        }
+                        onNavigateBack()
+                    }
+                ) {
+                    Icon(
+                        imageVector = if (notification.status != Notification.Status.ARCHIVED) {
+                            Icons.Default.Archive
+                        } else {
+                            Icons.Default.Unarchive
+                        },
+                        contentDescription = "Archive",
+                        tint = Color.Gray
+                    )
+                }
+
+                TextButton(
+                    onClick = {
+                        viewModel.deleteNotification(notification.id)
+                        Toast.makeText(context, "Notification deleted", Toast.LENGTH_SHORT).show()
+                        onNavigateBack()
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        tint = Color.Red
+                    )
+                }
             }
         }
     }

@@ -1,6 +1,7 @@
 package com.example.mad_assignment.ui.notifications
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,7 +44,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -222,25 +226,18 @@ fun OptionDropdownMenu(
             modifier = Modifier
                 .fillMaxWidth()
         ) {
-            Button(
-                onClick = { viewModel.markAllAsRead() },
-                shape = MaterialTheme.shapes.medium,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.surface,   // button background
-                    contentColor = Color.Blue       // text & icon color
-                ),
-                modifier = Modifier.padding(bottom = 10.dp).align(Alignment.CenterEnd)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "Mark All as Read",
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
+            Text(
+                text = "Mark All as Read",
+                color = Color.Blue,
+                fontSize = 15.sp,
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(bottom = 10.dp, end = 5.dp)
+                    .clickable {
+                        viewModel.markAllAsRead()
+                    }
+            )
         }
 
     }

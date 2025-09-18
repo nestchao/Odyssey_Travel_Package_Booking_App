@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mad_assignment.data.model.Notification
 import com.example.mad_assignment.data.respository.NotificationRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -138,8 +139,8 @@ class NotificationsViewModel(
         }
     }
 
-    fun getNotificationById(id: String): Notification? {
-        return notifications.value.find { it.id == id }
+    fun getNotificationById(id: String): Flow<Notification?> {
+        return repository.getNotificationById(id)
     }
 
     /**

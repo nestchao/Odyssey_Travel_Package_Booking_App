@@ -85,6 +85,13 @@ class NotificationRepository @Inject constructor(
     }
 
     /**
+     * Get a notification by ID
+     */
+    fun getNotificationById(notificationId: String): Flow<Notification?> {
+        return dataSource.getNotificationById(currentUserId, notificationId)
+    }
+
+    /**
      * Mark a notification as read
      */
     suspend fun markAsRead(notificationId: String): Result<Unit> {
