@@ -218,6 +218,31 @@ fun OptionDropdownMenu(
                 }
             }
         }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+        ) {
+            Button(
+                onClick = { viewModel.markAllAsRead() },
+                shape = MaterialTheme.shapes.medium,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.surface,   // button background
+                    contentColor = Color.Blue       // text & icon color
+                ),
+                modifier = Modifier.padding(bottom = 10.dp).align(Alignment.CenterEnd)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Mark All as Read",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+
     }
 }
 
