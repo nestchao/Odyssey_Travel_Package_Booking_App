@@ -51,10 +51,12 @@ import java.util.Locale
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.rememberNavController
+import com.example.mad_assignment.data.datasource.NotificationsDataSource
 import com.example.mad_assignment.data.respository.NotificationRepository
 import com.example.mad_assignment.ui.notifications.NotificationsScreen
 import com.example.mad_assignment.ui.notifications.NotificationsViewModel
 import com.example.mad_assignment.ui.notifications.NotificationsViewModelFactory
+import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
 fun HomeScreen(
@@ -262,7 +264,7 @@ fun EnhancedHomeHeader(
                     }
 
                     val notificationViewModel: NotificationsViewModel = viewModel(
-                        factory = NotificationsViewModelFactory(NotificationRepository())
+                        factory = NotificationsViewModelFactory(NotificationRepository(NotificationsDataSource(FirebaseFirestore.getInstance())))
                     )
                     val unreadCount by notificationViewModel.unreadCount.collectAsState()
 
@@ -275,7 +277,7 @@ fun EnhancedHomeHeader(
                         Box(contentAlignment = Alignment.Center) {
                             BadgedBox(
                                 badge = {
-                                    if (unreadCount > 0) { // 👈 only show when there are unread
+                                    if (unreadCount > 0) {
                                         Badge(
                                             containerColor = MaterialTheme.colorScheme.primary
                                         ) {

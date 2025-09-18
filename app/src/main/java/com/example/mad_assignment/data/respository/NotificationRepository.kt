@@ -1,80 +1,165 @@
 package com.example.mad_assignment.data.respository
 
+import com.example.mad_assignment.data.datasource.NotificationsDataSource
 import com.example.mad_assignment.data.model.Notification
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
+import java.sql.Timestamp
+import javax.inject.Inject
+import javax.inject.Singleton
 
-class NotificationRepository {
-    private val _notifications = MutableStateFlow(generateSampleNotifications())
-    val notifications: Flow<List<Notification>> = _notifications.asStateFlow()
+@Singleton
+class NotificationRepository @Inject constructor(
+    private val dataSource: NotificationsDataSource
+) {
+    private var currentUserId: String = "1" // set after login
 
-    private fun generateSampleNotifications(): List<Notification> {
-        return listOf(
-            Notification(
-                id = "1", title = "Welcome to Odyssey!", message = "Thanks for joining our fitness community.",
-                type = Notification.NotificationType.WELCOME,
-                status = Notification.Status.READ
-            ),
-            Notification(
-                "2", "Workout Reminder", "Don't forget your workout today!",
-                type = Notification.NotificationType.REMINDER,
-                status = Notification.Status.READ
-            ),
-            Notification(
-                "3", "Payment Successful", "Thank you for your payment.",
-                type = Notification.NotificationType.PAYMENT,
-                status = Notification.Status.READ
-            ),
-            Notification(
-                "4", "Class Replacement", "Your class has been rescheduled to tomorrow.",
-                type = Notification.NotificationType.CLASS,
-                status = Notification.Status.ARCHIVED
-            ),
-            Notification(
-                "5", "New Package Available", "Explore our new premium package!",
-                type = Notification.NotificationType.PACKAGE,
-                status = Notification.Status.READ
-            )
-        ).sortedByDescending { it.timestamp }
+    /**
+     * Set the current user ID (call this after authentication)
+     */
+    fun setCurrentUser(userId: String) {
+        currentUserId = userId
     }
 
-    suspend fun getNotifications(): List<Notification> = _notifications.value
+    /**
+     * Get all notifications for the current user
+     * Combines user-specific and global notifications
+     */
+    val notifications: Flow<List<Notification>> = combine(
+        dataSource.getUserNotifications(currentUserId),
+        dataSource.getGlobalNotifications()
+    ) { userNotifications, globalNotifications ->
+        (userNotifications + globalNotifications)
+            .distinctBy { it.id }
+            .sortedByDescending { it.timestamp }
+    }
 
-    suspend fun getNotificationById(id: String): Notification? =
-        _notifications.value.find { it.id == id }
+    /**
+     * Get notifications for a specific user
+     */
+    fun getNotificationsForUser(userId: String): Flow<List<Notification>> {
+        return dataSource.getUserNotifications(userId)
+    }
 
-    suspend fun markAsRead(id: String) {
-        val currentList = _notifications.value.toMutableList()
-        val index = currentList.indexOfFirst { it.id == id }
-        if (index != -1) {
-            currentList[index] = currentList[index].copy(status = Notification.Status.READ)
-            _notifications.value = currentList
+    /**
+     * Create and add a new notification
+     */
+    suspend fun createNotification(
+        title: String,
+        message: String,
+        type: Notification.NotificationType = Notification.NotificationType.GENERAL,
+        userId: String = currentUserId
+    ): Result<String> {
+        val notification = Notification(
+            id = dataSource.generateNotificationId(),
+            title = title,
+            message = message,
+            timestamp = Timestamp(System.currentTimeMillis()),
+            type = type,
+            status = Notification.Status.UNREAD
+        )
+
+        return dataSource.addNotification(notification, userId)
+    }
+
+    /**
+     * Send notification to multiple users
+     */
+    suspend fun sendNotificationToUsers(
+        title: String,
+        message: String,
+        type: Notification.NotificationType,
+        userIds: List<String>
+    ): Result<List<String>> {
+        val notification = Notification(
+            id = dataSource.generateNotificationId(),
+            title = title,
+            message = message,
+            timestamp = Timestamp(System.currentTimeMillis()),
+            type = type,
+            status = Notification.Status.UNREAD
+        )
+
+        return dataSource.addNotificationForUsers(notification, userIds)
+    }
+
+    /**
+     * Mark a notification as read
+     */
+    suspend fun markAsRead(notificationId: String): Result<Unit> {
+        return dataSource.markAsRead(notificationId, currentUserId)
+    }
+
+    /**
+     * Mark a notification as archived
+     */
+    suspend fun markAsArchived(notificationId: String): Result<Unit> {
+        return dataSource.markAsArchived(notificationId, currentUserId)
+    }
+
+    /**
+     * Delete a notification (soft delete)
+     */
+    suspend fun deleteNotification(notificationId: String): Result<Unit> {
+        return dataSource.deleteNotification(notificationId, currentUserId)
+    }
+
+    /**
+     * Permanently delete a notification
+     */
+    suspend fun permanentlyDeleteNotification(notificationId: String): Result<Unit> {
+        return dataSource.permanentlyDeleteNotification(notificationId, currentUserId)
+    }
+
+    /**
+     * Mark all notifications as read
+     */
+    suspend fun markAllAsRead(): Result<Unit> {
+        return dataSource.markAllAsRead(currentUserId)
+    }
+
+    /**
+     * Get unread notification count
+     */
+    fun getUnreadCount(): Flow<Int> {
+        return dataSource.getUnreadCount(currentUserId)
+    }
+
+    /**
+     * Get notifications by type
+     */
+    fun getNotificationsByType(type: Notification.NotificationType): Flow<List<Notification>> {
+        return dataSource.getNotificationsByType(currentUserId, type)
+    }
+
+    /**
+     * Get notifications by status
+     */
+    fun getNotificationsByStatus(status: Notification.Status): Flow<List<Notification>> {
+        return dataSource.getNotificationsByStatus(currentUserId, status)
+    }
+
+    /**
+     * Delete old notifications
+     */
+    suspend fun deleteOldNotifications(daysOld: Int = 30): Result<Unit> {
+        return dataSource.deleteOldNotifications(currentUserId, daysOld)
+    }
+
+    /**
+     * Sample notifications for testing/demo
+     * This creates notifications in Firestore for the current user
+     */
+    suspend fun createSampleNotifications() {
+        val sampleData = listOf(
+            Triple("Welcome to Campus Connect!",
+                "Get started with your digital campus experience. Explore all features available to you.",
+                Notification.NotificationType.WELCOME)
+        )
+
+        sampleData.forEach { (title, message, type) ->
+            createNotification(title, message, type)
         }
     }
-
-    suspend fun markAsArchived(id: String) {
-        val currentList = _notifications.value.toMutableList()
-        val index = currentList.indexOfFirst { it.id == id }
-        if (index != -1) {
-            currentList[index] = currentList[index].copy(status = Notification.Status.ARCHIVED)
-            _notifications.value = currentList
-        }
-    }
-
-    suspend fun deleteNotification(id: String) {
-        _notifications.value = _notifications.value.filter { it.id != id }
-    }
-
-    suspend fun markAllAsRead() {
-        _notifications.value = _notifications.value.map { notification ->
-            if (notification.status == Notification.Status.UNREAD) {
-                notification.copy(status = Notification.Status.READ)
-            } else notification
-        }
-    }
-
-    fun getUnreadCount(): Flow<Int> =
-        notifications.map { list -> list.count { it.status == Notification.Status.UNREAD } }
 }

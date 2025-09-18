@@ -2,9 +2,11 @@ package com.example.mad_assignment.ui.notifications
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,28 +27,43 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.mad_assignment.data.datasource.NotificationsDataSource
 import com.example.mad_assignment.data.model.Notification
 import com.example.mad_assignment.data.respository.NotificationRepository
+import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
 fun NotificationDetailsScreen(
     notificationId: String,
     onNavigateBack: () -> Unit,
     viewModel: NotificationsViewModel = viewModel(
-        factory = NotificationsViewModelFactory(NotificationRepository())
+        factory = NotificationsViewModelFactory(NotificationRepository(NotificationsDataSource(FirebaseFirestore.getInstance())))
     ),
     modifier: Modifier = Modifier
+        .safeDrawingPadding()
+        .fillMaxSize()
 ) {
     val notifications by viewModel.notifications.collectAsState()
     val notification = notifications.find { it.id == notificationId }
 
-    ShowNotificationDetails(notification = notification, onNavigateBack = onNavigateBack)
+    viewModel.markAsRead(id = notificationId)
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(
+            modifier = modifier,
+        ) {
+            ShowNotificationDetails(notification = notification, onNavigateBack = onNavigateBack, modifier)
+        }
+    }
 }
 
 @Composable
 fun ShowNotificationDetails(
     notification: Notification?,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -59,7 +76,7 @@ fun ShowNotificationDetails(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(top = 120.dp, start = 30.dp, end = 16.dp),
+                        .padding(top = 80.dp, start = 30.dp, end = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item {
@@ -71,15 +88,15 @@ fun ShowNotificationDetails(
                     }
                     item {
                         Text(
-                            text = notification.message,
-                            style = MaterialTheme.typography.bodyLarge
+                            text = "Sent " + notification.getFormattedTime(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
                         )
                     }
                     item {
                         Text(
-                            text = notification.getFormattedTime(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray
+                            text = notification.message,
+                            style = MaterialTheme.typography.bodyLarge
                         )
                     }
                 }

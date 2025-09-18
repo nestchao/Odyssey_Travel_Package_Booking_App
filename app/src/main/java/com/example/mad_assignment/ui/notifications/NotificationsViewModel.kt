@@ -15,13 +15,23 @@ import kotlinx.coroutines.launch
 class NotificationsViewModel(
     private val repository: NotificationRepository
 ) : ViewModel() {
-
     private val _filter = MutableStateFlow(NotificationFilter.ALL)
     val filter: StateFlow<NotificationFilter> = _filter.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    fun loadSampleData() {
+        viewModelScope.launch {
+            repository.createSampleNotifications()
+        }
+    }
     val notifications: StateFlow<List<Notification>> = combine(
         repository.notifications,
         _filter,
@@ -68,32 +78,97 @@ class NotificationsViewModel(
         _searchQuery.value = query
     }
 
+    fun clearError() {
+        _errorMessage.value = null
+    }
+
     fun markAsRead(id: String) {
         viewModelScope.launch {
+            _isLoading.value = true
             repository.markAsRead(id)
+                .onSuccess {
+                    // Successfully marked as read
+                }
+                .onFailure { exception ->
+                    _errorMessage.value = "Failed to mark as read: ${exception.message}"
+                }
+            _isLoading.value = false
         }
     }
 
     fun markAsArchived(id: String) {
         viewModelScope.launch {
+            _isLoading.value = true
             repository.markAsArchived(id)
+                .onSuccess {
+                    // Successfully archived
+                }
+                .onFailure { exception ->
+                    _errorMessage.value = "Failed to archive: ${exception.message}"
+                }
+            _isLoading.value = false
         }
     }
 
     fun deleteNotification(id: String) {
         viewModelScope.launch {
+            _isLoading.value = true
             repository.deleteNotification(id)
+                .onSuccess {
+                    // Successfully deleted
+                }
+                .onFailure { exception ->
+                    _errorMessage.value = "Failed to delete: ${exception.message}"
+                }
+            _isLoading.value = false
         }
     }
 
     fun markAllAsRead() {
         viewModelScope.launch {
+            _isLoading.value = true
             repository.markAllAsRead()
+                .onSuccess {
+                    // All notifications marked as read
+                }
+                .onFailure { exception ->
+                    _errorMessage.value = "Failed to mark all as read: ${exception.message}"
+                }
+            _isLoading.value = false
         }
     }
 
     fun getNotificationById(id: String): Notification? {
         return notifications.value.find { it.id == id }
+    }
+
+    /**
+     * Create a test notification
+     */
+    fun createTestNotification() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            repository.createNotification(
+                title = "Test Notification",
+                message = "This is a test notification from the app",
+                type = Notification.NotificationType.GENERAL
+            ).onFailure { exception ->
+                _errorMessage.value = "Failed to create notification: ${exception.message}"
+            }
+            _isLoading.value = false
+        }
+    }
+
+    /**
+     * Clean up old notifications
+     */
+    fun cleanupOldNotifications(daysOld: Int = 30) {
+        viewModelScope.launch {
+            repository.deleteOldNotifications(daysOld)
+                .onFailure { exception ->
+                    _errorMessage.value = "Failed to cleanup: ${exception.message}"
+                }
+        }
     }
 }
 

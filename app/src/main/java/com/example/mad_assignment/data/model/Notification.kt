@@ -9,24 +9,29 @@ data class Notification(
     val id: String,
     val title: String,
     val message: String,
-    val timestamp: Timestamp = Timestamp(System.currentTimeMillis()),
+    val timestamp: Timestamp,
     val type: NotificationType,
-    val status: Status = Status.UNREAD
+    val status: Status = Status.UNREAD,
+    val sender: Sender = Sender.SYSTEM,
+    val receiver: Receiver = Receiver.USER
 ) {
     enum class Status {
         ARCHIVED, READ, UNREAD, DELETED
     }
 
     enum class NotificationType {
-        WELCOME, REMINDER, PAYMENT, CLASS, ANNOUNCEMENT, PACKAGE, GENERAL
+        WELCOME, REMINDER, PAYMENT, ANNOUNCEMENT, PACKAGE, GENERAL
     }
+
+    enum class Sender { SYSTEM }
+    enum class Receiver { USER }
 
     fun getFormattedTime(): String {
         val now = System.currentTimeMillis()
         val diff = now - timestamp.time
 
         return when {
-            diff < 60_000 -> "Just now"
+            diff < 60_000 -> "Just Now"
             diff < 3600_000 -> "${diff / 60_000}m ago"
             diff < 86400_000 -> "${diff / 3600_000}h ago"
             diff < 604800_000 -> "${diff / 86400_000}d ago"
