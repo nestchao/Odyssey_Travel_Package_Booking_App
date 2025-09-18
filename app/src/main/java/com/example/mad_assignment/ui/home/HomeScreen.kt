@@ -349,13 +349,11 @@ fun WelcomeSection() {
                 try {
                     fusedLocationClient.lastLocation.addOnSuccessListener { location ->
                         if (location != null) {
-                            // Use Geocoder to convert lat/long to a readable address
                             val geocoder = Geocoder(context, Locale.getDefault())
                             try {
                                 val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
                                 if (addresses?.isNotEmpty() == true) {
                                     val address = addresses[0]
-                                    // Format the address string
                                     val city = address.locality ?: "Unknown City"
                                     val country = address.countryName ?: "Unknown Country"
                                     locationText = "$city, $country"

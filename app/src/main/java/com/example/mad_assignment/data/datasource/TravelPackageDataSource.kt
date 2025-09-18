@@ -23,12 +23,15 @@ class TravelPackageDataSource @Inject constructor(
         private const val TRIPS_COLLECTION = "trips"
     }
 
-    fun getTravelPackages(): Flow<List<TravelPackage>> {
-        return firestore.collection(PACKAGES_COLLECTION)
-            .snapshots()
-            .map { snapshot ->
-                snapshot.toObjects<TravelPackage>()
-            }
+    suspend fun getTravelPackages(): Result<List<TravelPackage>> {
+        return try {
+            val snapshot = firestore.collection(PACKAGES_COLLECTION)
+                .get()
+                .await().toObjects<TravelPackage>()
+            Result.success(snapshot)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     suspend fun getPackageById(packageId: String): Result<TravelPackage?> {
@@ -98,5 +101,4 @@ class TravelPackageDataSource @Inject constructor(
             Result.failure(e)
         }
     }
-
 }

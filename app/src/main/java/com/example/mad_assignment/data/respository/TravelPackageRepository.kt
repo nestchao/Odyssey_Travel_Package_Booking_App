@@ -10,11 +10,9 @@ import javax.inject.Inject
 class TravelPackageRepository @Inject constructor(
     private val travelPackageDataSource: TravelPackageDataSource
 ) {
-    fun getTravelPackages(): Flow<List<TravelPackage>> {
-        return travelPackageDataSource.getTravelPackages()
-            .catch { exception ->
-                emit(emptyList())
-            }
+    suspend fun getTravelPackages(): List<TravelPackage> {
+        val result = travelPackageDataSource.getTravelPackages()
+        return result.getOrElse { emptyList() }
     }
 
     suspend fun getTravelPackage(packageId: String): TravelPackage? {
