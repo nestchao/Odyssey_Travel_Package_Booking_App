@@ -24,14 +24,14 @@ class HomeViewModel @Inject constructor(
 
     private fun loadPackages() {
         viewModelScope.launch {
-            travelPackageRepository.getTravelPackages()
-                .catch { exception ->
-                    _uiState.value = HomeUiState.Error(exception.message ?: "An unknown error occurred")
-                }
-                .collect { allPackages ->
-                    // The state now just holds the single list
-                    _uiState.value = HomeUiState.Success(allPackages)
-                }
+            // Set state to Loading before the network call
+            _uiState.value = HomeUiState.Loading
+            try {
+                val allPackages = travelPackageRepository.getTravelPackages()
+                _uiState.value = HomeUiState.Success(allPackages)
+            } catch (exception: Exception) {
+                _uiState.value = HomeUiState.Error(exception.message ?: "An unknown error occurred")
+            }
         }
     }
 }
