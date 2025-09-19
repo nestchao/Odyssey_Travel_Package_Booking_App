@@ -1,10 +1,11 @@
 package com.example.mad_assignment.ui.packagedetail
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.mad_assignment.data.model.DepartureDate
-import com.example.mad_assignment.data.repository.TravelPackageRepository // Corrected package name
+import com.example.mad_assignment.data.model.DepartureAndEndTime
+import com.example.mad_assignment.data.repository.TravelPackageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -18,17 +19,23 @@ import javax.inject.Inject
 @HiltViewModel
 class PackageDetailViewModel @Inject constructor(
     private val packageRepository: TravelPackageRepository,
+    // TODO: import cart repository here
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val packageId: String = savedStateHandle.get<String>("packageId")!!
+    private val packageId: String? = savedStateHandle.get<String>("packageId")
 
-    // A single source of truth for the entire screen's state.
     private val _uiState = MutableStateFlow<PackageDetailUiState>(PackageDetailUiState.Loading)
     val uiState: StateFlow<PackageDetailUiState> = _uiState.asStateFlow()
 
     init {
-        loadPackageAndRelatedData()
+        Log.d("PackageDetailVM", "Initializing with packageId: $packageId")
+        if (packageId != null) {
+            loadPackageAndRelatedData()
+        } else {
+            Log.e("PackageDetailVM", "Package ID is null")
+            _uiState.value = PackageDetailUiState.Error("Package ID not provided")
+        }
     }
 
     private fun loadPackageAndRelatedData() {
@@ -36,57 +43,82 @@ class PackageDetailViewModel @Inject constructor(
             _uiState.value = PackageDetailUiState.Loading
 
             try {
-                // Step 1: Fetch the main travel package.
-                val travelPackage = packageRepository.getTravelPackage(packageId)
-                if (travelPackage == null) {
+                Log.d("PackageDetailVM", "Loading package details for ID: $packageId")
+
+                val packageDetailData = packageRepository.getPackageWithImages(packageId!!)
+                if (packageDetailData == null) {
+                    Log.e("PackageDetailVM", "Package not found for ID: $packageId")
                     _uiState.value = PackageDetailUiState.Error("Package not found.")
                     return@launch
                 }
 
-                // Step 2: Fetch related data (trips and departures) in parallel for efficiency.
+                Log.d("PackageDetailVM", "Package loaded: ${packageDetailData.travelPackage.packageName}")
+
                 coroutineScope {
-                    val tripsDeferred = async { packageRepository.resolveTripsForPackage(travelPackage) }
-                    val departuresDeferred = async { packageRepository.getDepartureDates(packageId) }
+                    val tripsDeferred = async {
+                        try {
+                            Log.d("PackageDetailVM", "Loading trips for package")
+                            packageRepository.resolveTripsForPackage(packageDetailData.travelPackage)
+                        } catch (e: Exception) {
+                            Log.e("PackageDetailVM", "Error loading trips", e)
+                            emptyMap()
+                        }
+                    }
+
+                    val departuresDeferred = async {
+                        try {
+                            Log.d("PackageDetailVM", "Loading departure dates for package")
+                            packageRepository.getDepartureDates(packageId)
+                        } catch (e: Exception) {
+                            Log.e("PackageDetailVM", "Error loading departures", e)
+                            // Return the package options from the travel package itself as fallback
+                            packageDetailData.travelPackage.packageOption
+                        }
+                    }
 
                     val itineraryTrips = tripsDeferred.await()
                     val departures = departuresDeferred.await()
 
+                    Log.d("PackageDetailVM", "Loaded ${departures.size} departure dates")
+
+                    // Initialize pax counts with pricing categories set to 0
+                    val initialPaxCounts = packageDetailData.travelPackage.pricing.keys.associateWith { 0 }
+
                     _uiState.value = PackageDetailUiState.Success(
-                        travelPackage = travelPackage,
+                        packageDetail = packageDetailData,
                         itineraryTrips = itineraryTrips,
-                        departures = departures.getOrDefault(emptyList()) // Handle Result type from repo
+                        departures = departures,
+                        paxCounts = initialPaxCounts
                     )
                 }
-
             } catch (e: Exception) {
+                Log.e("PackageDetailVM", "Error loading package details", e)
                 _uiState.value = PackageDetailUiState.Error(e.message ?: "An unknown error occurred")
             }
         }
     }
 
-    fun selectDeparture(departure: DepartureDate) {
+    fun selectDeparture(departure: DepartureAndEndTime) {
         _uiState.update { currentState ->
             if (currentState is PackageDetailUiState.Success) {
-                // Initialize pax counts based on the available pricing categories for the package.
-                val initialPax = currentState.travelPackage.pricing.keys.associateWith { 1 }
-
-                // Create a new Success state object by copying the old one.
-                currentState.copy(
-                    selectedDeparture = departure,
-                    paxCounts = initialPax
-                )
+                Log.d("PackageDetailVM", "Selected departure: ${departure.id}")
+                currentState.copy(selectedDeparture = departure)
             } else {
                 currentState
             }
         }
     }
+
     fun updatePaxCount(category: String, change: Int) {
         _uiState.update { currentState ->
             if (currentState is PackageDetailUiState.Success) {
                 val currentPaxCounts = currentState.paxCounts.toMutableMap()
                 val currentCount = currentPaxCounts[category] ?: 0
                 val newCount = (currentCount + change).coerceAtLeast(0)
+
+
                 currentPaxCounts[category] = newCount
+                Log.d("PackageDetailVM", "Updated pax count for $category: $newCount")
 
                 currentState.copy(paxCounts = currentPaxCounts)
             } else {
@@ -94,4 +126,16 @@ class PackageDetailViewModel @Inject constructor(
             }
         }
     }
-}
+
+    /*
+     TODO: add function to pass the value to cart
+     fun addToCart(){
+        val cartItem = CartItem(
+            packageId = packageId,
+            departureDate = (uiState.value as? PackageDetailUiState.Success)?.selectedDeparture,
+            paxCounts = (uiState.value as? PackageDetailUiState.Success)?.paxCounts ?: emptyMap(),
+            totalPrice = (uiState.value as? PackageDetailUiState.Success)?.totalPrice ?: 0.0
+        )
+        // Add to cart repository
+     }
+     */}

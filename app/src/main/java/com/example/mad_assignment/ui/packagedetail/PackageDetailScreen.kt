@@ -34,17 +34,18 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.example.mad_assignment.data.model.DepartureDate
+import com.example.mad_assignment.data.model.DepartureAndEndTime
 import com.example.mad_assignment.data.model.TravelPackage
 import com.example.mad_assignment.data.model.Trip
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.Locale
-
+import com.example.mad_assignment.ui.packagedetail.PackageDetailData
+import com.example.mad_assignment.util.toDataUri
 @Composable
 fun PackageDetailScreen(onNavigateBack: () -> Unit) {
     val viewModel: PackageDetailViewModel = hiltViewModel()
-    // We only need to collect the single uiState. All other data is inside it.
+
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -75,7 +76,7 @@ fun PackageDetailScreen(onNavigateBack: () -> Unit) {
                 }
 
                 is PackageDetailUiState.Success -> {
-                    val travelPackage = state.travelPackage
+                    val packageDetail = state.packageDetail
                     val actionBarHeight = 100.dp
 
                     LazyColumn(
@@ -87,23 +88,21 @@ fun PackageDetailScreen(onNavigateBack: () -> Unit) {
                             .asPaddingValues()
                     ) {
                         item {
-                            EnhancedImageHeader(travelPackage, onNavigateBack)
+                            EnhancedImageHeader(state.packageDetail, onNavigateBack)
                         }
                         item {
-                            PackageTitle(travelPackage)
+                            PackageTitle(state.packageDetail.travelPackage)
                         }
                         item {
-                            // Access itineraryTrips from the state object
                             EnhancedPackageInfoBar(
-                                travelPackage = travelPackage,
+                                travelPackage = state.packageDetail.travelPackage,
                                 itineraryTrips = state.itineraryTrips
                             )
                         }
                         item {
-                            EnhancedDescriptionSection(travelPackage.packageDescription)
+                            EnhancedDescriptionSection(state.packageDetail.travelPackage.packageDescription)
                         }
                         item {
-                            // Pass data from the state object and update the lambda
                             EnhancedDateSelector(
                                 departures = state.departures,
                                 selectedDeparture = state.selectedDeparture,
@@ -111,9 +110,8 @@ fun PackageDetailScreen(onNavigateBack: () -> Unit) {
                             )
                         }
                         item {
-                            // Pass paxCounts from the state object
                             EnhancedPaxSelector(
-                                pricing = travelPackage.pricing,
+                                pricing = state.packageDetail.travelPackage.pricing,
                                 paxCounts = state.paxCounts,
                                 onPaxChanged = { category, change ->
                                     viewModel.updatePaxCount(category, change)
@@ -128,9 +126,9 @@ fun PackageDetailScreen(onNavigateBack: () -> Unit) {
                         }
                     }
 
-                    // Pass the entire success state to the action bar
                     EnhancedBookingActionBar(
                         state = state,
+                        // TODO: pass the viewModel function (viewModel.addToCart()) here
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding()
@@ -171,6 +169,7 @@ fun PackageDetailScreen(onNavigateBack: () -> Unit) {
     }
 }
 
+
 @Composable
 fun PackageTitle(travelPackage: TravelPackage) {
     Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
@@ -195,9 +194,9 @@ fun PackageTitle(travelPackage: TravelPackage) {
 
 @Composable
 fun EnhancedDateSelector(
-    departures: List<DepartureDate>,
-    selectedDeparture: DepartureDate?,
-    onDateSelected: (DepartureDate) -> Unit
+    departures: List<DepartureAndEndTime>,
+    selectedDeparture: DepartureAndEndTime?,
+    onDateSelected: (DepartureAndEndTime) -> Unit
 ) {
     Column(modifier = Modifier.padding(vertical = 16.dp)) {
         Row(
@@ -468,8 +467,12 @@ fun EnhancedLocationSection() {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun EnhancedImageHeader(travelPackage: TravelPackage, onNavigateBack: () -> Unit) {
-    val pagerState = rememberPagerState(pageCount = { travelPackage.imageUrls.size })
+fun EnhancedImageHeader(
+    packageDetail: PackageDetailData,
+    onNavigateBack: () -> Unit
+) {
+    val images = packageDetail.images
+    val pagerState = rememberPagerState(pageCount = { images.size })
 
     Box(
         modifier = Modifier
@@ -484,7 +487,7 @@ fun EnhancedImageHeader(travelPackage: TravelPackage, onNavigateBack: () -> Unit
         ) { page ->
             Box {
                 AsyncImage(
-                    model = travelPackage.imageUrls.getOrNull(page),
+                    model = toDataUri(images.getOrNull(page)?.base64Data, "image/jpeg"),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
@@ -699,10 +702,11 @@ fun EnhancedPaxRow(
 
 @Composable
 fun EnhancedBookingActionBar(
-    state: PackageDetailUiState.Success, // Receive the whole state
+    state: PackageDetailUiState.Success,
+    // TODO: onAddToCartClick: () -> Unit
     modifier: Modifier = Modifier
 ) {
-    val totalPrice = state.totalPrice // Use the helper property from the state class
+    val totalPrice = state.totalPrice
     val totalPax = state.paxCounts.values.sum()
     val hasSelection = totalPax > 0 && state.selectedDeparture != null
 
@@ -753,7 +757,7 @@ fun EnhancedBookingActionBar(
             ) {
                 if (hasSelection) {
                     OutlinedButton(
-                        onClick = { /* TODO: Add to cart */ },
+                        onClick = { /* TODO: add to the cart  (onAddToCartClick)*/ },
                         modifier = Modifier.weight(1f).height(56.dp),
                         border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(16.dp)
@@ -764,7 +768,7 @@ fun EnhancedBookingActionBar(
                     }
 
                     Button(
-                        onClick = { /* TODO: Book now */ },
+                        onClick = { /* TODO: navigate to checkout page */ },
                         modifier = Modifier.weight(1f).height(56.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)

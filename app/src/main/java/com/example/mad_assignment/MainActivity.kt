@@ -17,13 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.mad_assignment.ui.AppNavigation
 import com.example.mad_assignment.ui.theme.MAD_ASSIGNMENTTheme
-import com.example.mad_assignment.util.FirebaseSeeder
-import com.google.firebase.firestore.ktx.BuildConfig
+import com.example.mad_assignment.util.DataUploader
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
@@ -31,50 +28,37 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContent {
             MAD_ASSIGNMENTTheme {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // This is your main app UI
                     AppNavigation()
-
-                    // --- This is your temporary "admin" section ---
 //                    val scope = rememberCoroutineScope()
 //                    val firestore = Firebase.firestore
-
+//
 //                    Column(
-//                        modifier = Modifier.align(Alignment.TopCenter).padding(top = 80.dp),
+//                        modifier = Modifier
+//                            .align(Alignment.TopEnd)
+//                            .padding(top = 80.dp, end = 16.dp),
 //                        horizontalAlignment = Alignment.CenterHorizontally
 //                    ) {
-////                         Button to upload a full package
 //                        Button(
 //                            onClick = {
 //                                scope.launch {
-//                                    DataUploader
+//                                    try {
+//                                        Log.d("MainActivity", "Seed Database button clicked.")
+//                                        DataUploader.seedDatabase(firestore)
+//                                        Log.d("MainActivity", "Seeding process finished.")
+//                                    } catch (e: Exception) {
+//                                        Log.e("MainActivity", "Error during seeding", e)
+//                                    }
 //                                }
 //                            }
 //                        ) {
-//                            Text("Upload Sample Package")
+//                            Text("Seed Database")
 //                        }
-
-//                         --- ADD THIS NEW BUTTON ---
-//                        Button(
-//                            onClick = {
-//                                scope.launch {
-//                                    val newTripId = uploadNewTrip(firestore)
-//                                    if (newTripId != null) {
-//                                        Log.d("MainActivity", "New trip created with ID: $newTripId")
-//                                        // You could show a Toast message here for confirmation
-//                                    }
-//                                }
-//                            },
-//                            modifier = Modifier.padding(top = 8.dp)
-//                        ) {
-//                            Text("Upload New Trip")
-//                        }
-                    }
+//                    }
                 }
             }
         }
     }
-
+}
