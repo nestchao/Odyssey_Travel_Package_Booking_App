@@ -84,6 +84,8 @@ class BookingRepository @Inject constructor(
             .onFailure { Log.e(TAG, "completeBooking failed", it) }
     }
 
+    // change when package start and end timestamp is available
+    // call need service past bookings, upcoming/current/past booking type
     suspend fun completePastBookings(): Result<Unit> {
         return bookingDataSource.completePastBookings()
             .onFailure { Log.e(TAG, "completePastBookings failed", it) }

@@ -52,7 +52,8 @@ import androidx.compose.ui.text.input.TextFieldValue
 
 @Composable
 fun HomeScreen(
-    onPackageClick: (String) -> Unit
+    onPackageClick: (String) -> Unit,
+    onNavigateToCart: () -> Unit
 ) {
     val viewModel: HomeViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -75,7 +76,8 @@ fun HomeScreen(
                 is HomeUiState.Success -> {
                     EnhancedHomeContent(
                         packages = state.packages,
-                        onPackageClick = onPackageClick
+                        onPackageClick = onPackageClick,
+                        onNavigateToCart = onNavigateToCart
                     )
                 }
                 is HomeUiState.Error -> {
@@ -154,14 +156,17 @@ fun EnhancedErrorState(message: String) {
 @Composable
 fun EnhancedHomeContent(
     packages: List<TravelPackage>,
-    onPackageClick: (String) -> Unit
+    onPackageClick: (String) -> Unit,
+    onNavigateToCart : () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
-            EnhancedHomeHeader()
+            EnhancedHomeHeader(
+                onNavigateToCart = onNavigateToCart
+            )
         }
         item {
             WelcomeSection()
@@ -195,7 +200,9 @@ fun EnhancedHomeContent(
 }
 
 @Composable
-fun EnhancedHomeHeader() {
+fun EnhancedHomeHeader(
+    onNavigateToCart: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -227,7 +234,7 @@ fun EnhancedHomeHeader() {
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Surface(
-                        onClick = { /* TODO: Shopping Cart */ },
+                        onClick = { onNavigateToCart() },
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surface,
                         modifier = Modifier.size(48.dp)

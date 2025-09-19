@@ -49,7 +49,7 @@ class BookingDataSource @Inject constructor(
                     val capacity = departureDateSnapshot.getLong("capacity") ?: 0
                     val currentCapacity = 0 // TODO: get current booked capacity for this package
 
-                    if (currentCapacity + cartItem.travelerCount > capacity) {
+                    if (currentCapacity + cartItem.totalTravelerCount > capacity) {
                         throw FirebaseFirestoreException("Package is at full capacity.", FirebaseFirestoreException.Code.ABORTED)
                     }
 
@@ -59,10 +59,15 @@ class BookingDataSource @Inject constructor(
                         bookingId = newBookingRef.id,
                         userId = userId,
                         packageId = cartItem.packageId,
+                        noOfAdults = cartItem.noOfAdults,
+                        noOfChildren = cartItem.noOfChildren,
+                        totalTravelerCount = cartItem.totalTravelerCount,
                         subtotal = cartItem.basePrice,
                         totalAmount = cartItem.totalPrice,
                         departureDate = cartItem.departureDate,
-                        bookingDate = Timestamp.now(),
+                        startBookingDate = cartItem.departureDate?.startDate, // change when package start timestamp is available,
+                        endBookingDate = cartItem.departureDate?.startDate, // change when package end timestamp is available
+                        createdAt = Timestamp.now(),
                         updatedAt = Timestamp.now(),
                         status = BookingStatus.CONFIRMED
                     )
