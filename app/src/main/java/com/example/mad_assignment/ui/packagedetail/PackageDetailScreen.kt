@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.mad_assignment.data.model.DepartureAndEndTime
 import com.example.mad_assignment.data.model.TravelPackage
 import com.example.mad_assignment.data.model.Trip
@@ -487,7 +489,7 @@ fun EnhancedImageHeader(
         ) { page ->
             Box {
                 AsyncImage(
-                    model = toDataUri(images.getOrNull(page)?.base64Data, "image/jpeg"),
+                    model = ImageRequest.Builder(LocalContext.current).data(toDataUri(images.getOrNull(page)?.base64Data)).build(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
