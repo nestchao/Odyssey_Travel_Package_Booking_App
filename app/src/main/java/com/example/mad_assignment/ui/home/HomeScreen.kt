@@ -57,6 +57,7 @@ import com.example.mad_assignment.ui.notifications.NotificationsScreen
 import com.example.mad_assignment.ui.notifications.NotificationsViewModel
 import com.example.mad_assignment.ui.notifications.NotificationsViewModelFactory
 import com.google.firebase.firestore.FirebaseFirestore
+import coil.request.ImageRequest
 import com.example.mad_assignment.ui.home.TravelPackageWithImages
 import com.example.mad_assignment.util.toDataUri
 
@@ -635,10 +636,15 @@ fun EnhancedAroundYouCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Box {
-            val finalImageUrl = toDataUri(imageUrl, "image/jpeg")
-            Log.d("ImageDebug", "Attempting to load image with URL: $finalImageUrl")
+            val decodedImage = toDataUri(imageUrl)
+            if (decodedImage == null) {
+                Log.e("EnhancedAroundYouCard", "Failed to decode image for '$title'. imageUrl was: ${if (imageUrl.isBlank()) "BLANK" else imageUrl.take(50) + "..."}")
+            } else {
+                Log.d("EnhancedAroundYouCard", "Successfully decoded image for '$title'. Byte array size: ${decodedImage.size} bytes.")
+            }
             AsyncImage(
-                model = finalImageUrl,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data( toDataUri(imageUrl)).build(),
                 contentDescription = title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
@@ -705,7 +711,9 @@ fun EnhancedPackageCard(
     ) {
         Row(modifier = Modifier.height(120.dp)) {
             AsyncImage(
-                model = toDataUri(packageData.images.firstOrNull()?.base64Data, "image/jpeg"),
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(toDataUri(packageData.images.firstOrNull()?.base64Data))
+                    .build(),
                 contentDescription = packageData.travelPackage.packageName,
                 modifier = Modifier
                     .width(120.dp)
