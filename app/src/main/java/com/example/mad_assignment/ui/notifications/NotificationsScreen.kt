@@ -1,5 +1,6 @@
 package com.example.mad_assignment.ui.notifications
 
+import android.util.Size
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.MarkChatUnread
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -44,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -52,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mad_assignment.data.datasource.NotificationsDataSource
+import com.example.mad_assignment.data.datasource.ScheduledNotificationDataSource
 import com.example.mad_assignment.data.model.Notification
 import com.example.mad_assignment.data.respository.NotificationRepository
 import com.google.firebase.firestore.FirebaseFirestore
@@ -59,9 +63,14 @@ import com.google.firebase.firestore.FirebaseFirestore
 @Composable
 fun NotificationsScreen(
     onNavigateBack: () -> Unit,
+    onSendClick: () -> Unit,
     onNotificationClick: (notificationId: String) -> Unit,
     viewModel: NotificationsViewModel = viewModel(
-        factory = NotificationsViewModelFactory(NotificationRepository(NotificationsDataSource(FirebaseFirestore.getInstance())))
+        factory = NotificationsViewModelFactory(NotificationRepository(
+            dataSource = NotificationsDataSource(firestore = FirebaseFirestore.getInstance()),
+            scheduledDataSource = ScheduledNotificationDataSource(firestore = FirebaseFirestore.getInstance()),
+            context = LocalContext.current
+        ))
     ),
     modifier: Modifier = Modifier
         .safeDrawingPadding()
@@ -74,7 +83,7 @@ fun NotificationsScreen(
         Column(
             modifier = modifier
         ) {
-            NotificationScreenHeader(onNavigateBack = onNavigateBack)
+            NotificationScreenHeader(onNavigateBack = onNavigateBack, onSendClicked = onSendClick)
             OptionDropdownMenu(viewModel = viewModel)
             ShowNotifications(viewModel = viewModel, onNotificationClick = onNotificationClick)
         }
@@ -83,7 +92,8 @@ fun NotificationsScreen(
 
 @Composable
 fun NotificationScreenHeader(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onSendClicked: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -113,6 +123,23 @@ fun NotificationScreenHeader(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.align(Alignment.Center)
         )
+        // check if current user is admin: if-else
+        Button(
+            onClick = { onSendClicked() },
+            shape = MaterialTheme.shapes.medium,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.surface,   // button background
+                contentColor = MaterialTheme.colorScheme.onSurface    // text & icon color
+            ),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Send,
+                contentDescription = "Send Notification",
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 @Composable

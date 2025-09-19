@@ -1,8 +1,11 @@
 package com.example.mad_assignment.data.respository
 
+import android.content.Context
 import com.example.mad_assignment.data.datasource.NotificationsDataSource
+import com.example.mad_assignment.data.datasource.ScheduledNotificationDataSource
 import com.example.mad_assignment.data.model.Notification
-import com.google.firebase.firestore.FirebaseFirestore
+import com.example.mad_assignment.data.model.ScheduledNotification
+import com.example.mad_assignment.worker.NotificationScheduler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import java.sql.Timestamp
@@ -11,7 +14,9 @@ import javax.inject.Singleton
 
 @Singleton
 class NotificationRepository @Inject constructor(
-    private val dataSource: NotificationsDataSource
+    private val dataSource: NotificationsDataSource,
+    private val scheduledDataSource: ScheduledNotificationDataSource,
+    private val context: Context
 ) {
     private var currentUserId: String = "1" // set after login
 
@@ -34,6 +39,12 @@ class NotificationRepository @Inject constructor(
             .distinctBy { it.id }
             .sortedByDescending { it.timestamp }
     }
+
+    /**
+     * Get scheduled notifications for the current user
+     */
+    val scheduledNotifications: Flow<List<ScheduledNotification>> =
+        scheduledDataSource.getScheduledNotifications(currentUserId)
 
     /**
      * Get notifications for a specific user
@@ -61,6 +72,55 @@ class NotificationRepository @Inject constructor(
         )
 
         return dataSource.addNotification(notification, userId)
+    }
+
+    /**
+     * Schedule a notification for future delivery
+     */
+    suspend fun scheduleNotification(
+        title: String,
+        message: String,
+        type: Notification.NotificationType,
+        scheduledTime: Long,
+        userId: String = currentUserId
+    ): Result<String> {
+        val scheduledNotification = ScheduledNotification(
+            id = scheduledDataSource.generateScheduledNotificationId(),
+            title = title,
+            message = message,
+            type = type,
+            scheduledTime = scheduledTime
+        )
+
+        return try {
+            // Save to database
+            val saveResult = scheduledDataSource.addScheduledNotification(scheduledNotification, userId)
+
+            if (saveResult.isSuccess) {
+                // Schedule with WorkManager
+                NotificationScheduler.scheduleNotification(context, scheduledNotification)
+                Result.success(scheduledNotification.id)
+            } else {
+                saveResult
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Delete a scheduled notification
+     */
+    suspend fun deleteScheduledNotification(scheduledNotificationId: String): Result<Unit> {
+        return try {
+            // Cancel the WorkManager task
+            NotificationScheduler.cancelScheduledNotification(context, scheduledNotificationId)
+
+            // Remove from database
+            scheduledDataSource.deleteScheduledNotification(scheduledNotificationId)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     /**
@@ -167,6 +227,38 @@ class NotificationRepository @Inject constructor(
 
         sampleData.forEach { (title, message, type) ->
             createNotification(title, message, type)
+        }
+    }
+
+    /**
+     * Process scheduled notifications that are due
+     * This would typically be called by a background service
+     */
+    suspend fun processDueScheduledNotifications(): Result<Unit> {
+        return try {
+            val dueNotifications = scheduledDataSource.getDueScheduledNotifications()
+
+            dueNotifications.onSuccess { notifications ->
+                notifications.forEach { scheduledNotification ->
+                    // Create the actual notification
+                    createNotification(
+                        title = scheduledNotification.title,
+                        message = scheduledNotification.message,
+                        type = scheduledNotification.type,
+                        userId = currentUserId
+                    )
+
+                    // Update status to SENT
+                    scheduledDataSource.updateScheduledNotificationStatus(
+                        scheduledNotification.id,
+                        ScheduledNotification.ScheduleStatus.SENT
+                    )
+                }
+            }
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 }

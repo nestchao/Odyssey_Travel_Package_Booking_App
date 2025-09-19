@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Unarchive
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -29,6 +30,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mad_assignment.data.datasource.NotificationsDataSource
+import com.example.mad_assignment.data.datasource.ScheduledNotificationDataSource
 import com.example.mad_assignment.data.model.Notification
 import com.example.mad_assignment.data.respository.NotificationRepository
 import com.google.firebase.firestore.FirebaseFirestore
@@ -50,7 +55,11 @@ fun NotificationDetailsScreen(
     notificationId: String,
     onNavigateBack: () -> Unit,
     viewModel: NotificationsViewModel = viewModel(
-        factory = NotificationsViewModelFactory(NotificationRepository(NotificationsDataSource(FirebaseFirestore.getInstance())))
+        factory = NotificationsViewModelFactory(NotificationRepository(
+            dataSource = NotificationsDataSource(firestore = FirebaseFirestore.getInstance()),
+            scheduledDataSource = ScheduledNotificationDataSource(firestore = FirebaseFirestore.getInstance()),
+            context = LocalContext.current
+        ))
     ),
     modifier: Modifier = Modifier
         .safeDrawingPadding()
@@ -189,17 +198,45 @@ fun DetailScreenHeader(
                     )
                 }
 
+                var showDialog by rememberSaveable { mutableStateOf(false) }
+
                 TextButton(
-                    onClick = {
-                        viewModel.deleteNotification(notification.id)
-                        Toast.makeText(context, "Notification deleted", Toast.LENGTH_SHORT).show()
-                        onNavigateBack()
-                    }
+                    onClick = { showDialog = true }
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Delete",
                         tint = Color.Red
+                    )
+                }
+
+                /**
+                 * Show confirmation dialog to ask user whether to proceed with notification deletion
+                 */
+                if (showDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDialog = false },
+                        title = { Text("Delete Notification") },
+                        text = { Text("Are you sure you want to delete this notification?") },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    viewModel.deleteNotification(notification.id)
+                                    Toast.makeText(context, "Notification deleted", Toast.LENGTH_SHORT).show()
+                                    showDialog = false
+                                    onNavigateBack()
+                                }
+                            ) {
+                                Text("Yes")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = { showDialog = false }
+                            ) {
+                                Text("Cancel")
+                            }
+                        }
                     )
                 }
             }

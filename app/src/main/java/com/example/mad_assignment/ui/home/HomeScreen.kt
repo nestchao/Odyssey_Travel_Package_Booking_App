@@ -58,6 +58,7 @@ import com.example.mad_assignment.ui.notifications.NotificationsViewModel
 import com.example.mad_assignment.ui.notifications.NotificationsViewModelFactory
 import com.google.firebase.firestore.FirebaseFirestore
 import coil.request.ImageRequest
+import com.example.mad_assignment.data.datasource.ScheduledNotificationDataSource
 import com.example.mad_assignment.ui.home.TravelPackageWithImages
 import com.example.mad_assignment.util.toDataUri
 
@@ -259,7 +260,10 @@ fun EnhancedHomeHeader(
                     }
 
                     val notificationViewModel: NotificationsViewModel = viewModel(
-                        factory = NotificationsViewModelFactory(NotificationRepository(NotificationsDataSource(FirebaseFirestore.getInstance())))
+                        factory = NotificationsViewModelFactory(NotificationRepository(
+                            dataSource = NotificationsDataSource(firestore = FirebaseFirestore.getInstance()),
+                            scheduledDataSource = ScheduledNotificationDataSource(firestore = FirebaseFirestore.getInstance()),
+                            context = LocalContext.current))
                     )
                     val unreadCount by notificationViewModel.unreadCount.collectAsState()
 

@@ -1,9 +1,15 @@
 package com.example.mad_assignment.ui.notifications
 
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.example.mad_assignment.data.model.Notification
+import com.example.mad_assignment.data.model.ScheduledNotification
 import com.example.mad_assignment.data.respository.NotificationRepository
+import com.example.mad_assignment.worker.NotificationWorker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -12,6 +18,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 class NotificationsViewModel(
     private val repository: NotificationRepository
@@ -27,6 +35,9 @@ class NotificationsViewModel(
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    private val _scheduledNotifications = MutableStateFlow<List<ScheduledNotification>>(emptyList())
+    val scheduledNotifications: StateFlow<List<ScheduledNotification>> = _scheduledNotifications.asStateFlow()
 
     fun loadSampleData() {
         viewModelScope.launch {
@@ -169,6 +180,131 @@ class NotificationsViewModel(
                 .onFailure { exception ->
                     _errorMessage.value = "Failed to cleanup: ${exception.message}"
                 }
+        }
+    }
+
+    /**
+     * Schedule a new notification
+     */
+    fun scheduleNotification(
+        title: String,
+        message: String,
+        type: Notification.NotificationType,
+        scheduledTime: Long
+    ) {
+        viewModelScope.launch {
+            val scheduledNotification = ScheduledNotification(
+                id = UUID.randomUUID().toString(),
+                title = title,
+                message = message,
+                type = type,
+                scheduledTime = scheduledTime
+            )
+
+            val currentList = _scheduledNotifications.value.toMutableList()
+            currentList.add(scheduledNotification)
+            _scheduledNotifications.value = currentList.sortedBy { it.scheduledTime }
+
+            // TODO: Here you would integrate with Android's AlarmManager or WorkManager
+            // to actually schedule the notification delivery
+            scheduleNotificationDelivery(scheduledNotification)
+        }
+    }
+
+    /**
+     * Delete a scheduled notification
+     */
+    fun deleteScheduledNotification(id: String) {
+        viewModelScope.launch {
+            val currentList = _scheduledNotifications.value.toMutableList()
+            currentList.removeAll { it.id == id }
+            _scheduledNotifications.value = currentList
+
+            // Cancel the scheduled delivery
+            cancelScheduledNotificationDelivery(id)
+        }
+    }
+
+    /**
+     * Load scheduled notifications (in a real app, this would be from a database)
+     */
+    private fun loadScheduledNotifications() {
+        viewModelScope.launch {
+            // For demo purposes, create some sample scheduled notifications
+            val sampleScheduled = listOf(
+                ScheduledNotification(
+                    id = UUID.randomUUID().toString(),
+                    title = "Weekly Report Reminder",
+                    message = "Don't forget to submit your weekly report by Friday",
+                    type = Notification.NotificationType.REMINDER,
+                    scheduledTime = System.currentTimeMillis() + (24 * 60 * 60 * 1000) // Tomorrow
+                ),
+                ScheduledNotification(
+                    id = UUID.randomUUID().toString(),
+                    title = "Payment Due",
+                    message = "Your monthly payment is due in 3 days",
+                    type = Notification.NotificationType.PAYMENT,
+                    scheduledTime = System.currentTimeMillis() + (3 * 24 * 60 * 60 * 1000) // In 3 days
+                )
+            )
+            _scheduledNotifications.value = sampleScheduled.sortedBy { it.scheduledTime }
+        }
+    }
+
+    /**
+     * Schedule notification delivery using system scheduler
+     */
+    private fun scheduleNotificationDelivery(scheduledNotification: ScheduledNotification) {
+        // TODO: Implement with WorkManager
+        // Example:
+         val workRequest = OneTimeWorkRequestBuilder<NotificationWorker>()
+             .setInitialDelay(scheduledNotification.scheduledTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS)
+             .setInputData(workDataOf(
+                 "title" to scheduledNotification.title,
+                 "message" to scheduledNotification.message,
+                 "type" to scheduledNotification.type.name
+             ))
+             .build()
+         WorkManager.getInstance(context).enqueue(workRequest)
+    }
+
+    /**
+     * Cancel scheduled notification delivery
+     */
+    private fun cancelScheduledNotificationDelivery(id: String) {
+        // TODO: Implement with WorkManager
+         WorkManager.getInstance(context).cancelWorkById(UUID.fromString(id))
+    }
+
+    /**
+     * Check for notifications that should be sent now and send them
+     * This would typically run periodically or be triggered by the scheduler
+     */
+    fun processScheduledNotifications() {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val toSend = _scheduledNotifications.value.filter {
+                it.scheduledTime <= now && it.status == ScheduledNotification.ScheduleStatus.PENDING
+            }
+
+            toSend.forEach { scheduledNotification ->
+                // Create and send the actual notification
+                repository.createNotification(
+                    title = scheduledNotification.title,
+                    message = scheduledNotification.message,
+                    type = scheduledNotification.type
+                )
+
+                // Update the status to SENT
+                val updatedList = _scheduledNotifications.value.map {
+                    if (it.id == scheduledNotification.id) {
+                        it.copy(status = ScheduledNotification.ScheduleStatus.SENT)
+                    } else {
+                        it
+                    }
+                }
+                _scheduledNotifications.value = updatedList
+            }
         }
     }
 }
