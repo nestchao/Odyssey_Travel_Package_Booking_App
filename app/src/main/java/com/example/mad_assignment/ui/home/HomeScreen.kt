@@ -49,6 +49,8 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.android.gms.location.LocationServices
 import java.util.Locale
 import androidx.compose.ui.text.input.TextFieldValue
+import com.example.mad_assignment.ui.home.TravelPackageWithImages
+import com.example.mad_assignment.util.toDataUri
 
 @Composable
 fun HomeScreen(
@@ -153,44 +155,36 @@ fun EnhancedErrorState(message: String) {
 
 @Composable
 fun EnhancedHomeContent(
-    packages: List<TravelPackage>,
+    packages: List<TravelPackageWithImages>,
     onPackageClick: (String) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        item { EnhancedHomeHeader() }
+        item { WelcomeSection() }
         item {
-            EnhancedHomeHeader()
-        }
-        item {
-            WelcomeSection()
-        }
-        item () {
             EnhancedAroundYouSection(
                 featuredPackages = packages.take(3),
                 onPackageClick = onPackageClick
             )
         }
-        item {
-            PopularDestinationsSection()
-        }
+        item { PopularDestinationsSection() }
         item {
             EnhancedSectionHeader(
                 title = "All Packages",
                 subtitle = "${packages.size} amazing destinations",
-                onViewMoreClick = { /* TODO */ }
+                onViewMoreClick = { /* TODO: View More Functions */ }
             )
         }
-        items(packages, key = {it.packageId}) { travelPackage ->
+        items(packages, key = { it.travelPackage.packageId }) { travelPackageWithImages ->
             EnhancedPackageCard(
-                packageData = travelPackage,
-                onClick = { onPackageClick(travelPackage.packageId) }
+                packageData = travelPackageWithImages,
+                onClick = { onPackageClick(travelPackageWithImages.travelPackage.packageId) }
             )
         }
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-        }
+        item { Spacer(modifier = Modifier.height(16.dp)) }
     }
 }
 
@@ -553,7 +547,7 @@ fun EnhancedSectionHeader(
 
 @Composable
 fun EnhancedAroundYouSection(
-    featuredPackages: List<TravelPackage>,
+    featuredPackages: List<TravelPackageWithImages>,
     onPackageClick: (String) -> Unit
 ) {
     Column(modifier = Modifier.padding(vertical = 16.dp)) {
@@ -594,10 +588,10 @@ fun EnhancedAroundYouSection(
         ) {
             items(featuredPackages) { packageItem ->
                 EnhancedAroundYouCard(
-                    title = packageItem.packageName,
-                    imageUrl = packageItem.imageUrls.firstOrNull() ?: "",
-                    price = packageItem.pricing.values.minOrNull() ?: 0.0,
-                    onClick = { onPackageClick(packageItem.packageId) }
+                    title = packageItem.travelPackage.packageName, // <-- CHANGED
+                    imageUrl = packageItem.images.firstOrNull()?.base64Data ?: "", // <-- FIXED
+                    price = packageItem.travelPackage.pricing.values.minOrNull() ?: 0.0, // <-- CHANGED
+                    onClick = { onPackageClick(packageItem.travelPackage.packageId) } // <-- CHANGED
                 )
             }
         }
@@ -618,14 +612,15 @@ fun EnhancedAroundYouCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Box {
+            val finalImageUrl = toDataUri(imageUrl, "image/jpeg")
+            Log.d("ImageDebug", "Attempting to load image with URL: $finalImageUrl")
             AsyncImage(
-                model = imageUrl,
+                model = finalImageUrl,
                 contentDescription = title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Gradient overlay
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -670,7 +665,10 @@ fun EnhancedAroundYouCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EnhancedPackageCard(packageData: TravelPackage, onClick: () -> Unit) {
+fun EnhancedPackageCard(
+    packageData: TravelPackageWithImages,
+    onClick: () -> Unit
+) {
     Card(
         onClick = onClick,
         modifier = Modifier
@@ -684,8 +682,8 @@ fun EnhancedPackageCard(packageData: TravelPackage, onClick: () -> Unit) {
     ) {
         Row(modifier = Modifier.height(120.dp)) {
             AsyncImage(
-                model = packageData.imageUrls.firstOrNull(),
-                contentDescription = packageData.packageName,
+                model = toDataUri(packageData.images.firstOrNull()?.base64Data, "image/jpeg"),
+                contentDescription = packageData.travelPackage.packageName,
                 modifier = Modifier
                     .width(120.dp)
                     .fillMaxHeight()
@@ -701,7 +699,7 @@ fun EnhancedPackageCard(packageData: TravelPackage, onClick: () -> Unit) {
             ) {
                 Column {
                     Text(
-                        text = packageData.packageName,
+                        text = packageData.travelPackage.packageName,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -718,7 +716,7 @@ fun EnhancedPackageCard(packageData: TravelPackage, onClick: () -> Unit) {
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            "${packageData.durationDays}D ${packageData.durationDays - 1}N",
+                            "${packageData.travelPackage.durationDays}D ${packageData.travelPackage.durationDays - 1}N",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -731,13 +729,14 @@ fun EnhancedPackageCard(packageData: TravelPackage, onClick: () -> Unit) {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column {
+                        val price = packageData.travelPackage.pricing.values.minOrNull() ?: 0.0
                         Text(
-                            "From RM ${"%.0f".format(packageData.pricing.values.minOrNull() ?: 0.0)}",
+                            "From RM ${"%.0f".format(price)}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            "RM ${"%.0f".format(packageData.pricing.values.minOrNull() ?: 0.0)}",
+                            "RM ${"%.0f".format(price)}",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
