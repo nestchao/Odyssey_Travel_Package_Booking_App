@@ -227,7 +227,7 @@ fun EnhancedHomeHeader() {
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Surface(
-                        onClick = { /* TODO: Shopping Cart */ },
+                        onClick = { },
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surface,
                         modifier = Modifier.size(48.dp)
