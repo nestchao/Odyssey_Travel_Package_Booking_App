@@ -11,6 +11,8 @@ import com.example.mad_assignment.ui.forgetpassword.ForgotPasswordScreen
 import com.example.mad_assignment.ui.forgetpassword.ForgotPasswordViewModel
 import com.example.mad_assignment.ui.home.HomeScreen
 import com.example.mad_assignment.ui.packagedetail.PackageDetailScreen
+import com.example.mad_assignment.ui.profile.ProfileScreen
+import com.example.mad_assignment.ui.profile.ProfileViewModel
 import com.example.mad_assignment.ui.signin.SignInScreen
 import com.example.mad_assignment.ui.signin.SignInViewModel
 import com.example.mad_assignment.ui.signup.SignUpScreen
@@ -100,6 +102,15 @@ fun AppNavigation() {
         ) {
             PackageDetailScreen(
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable("profile") {
+            val viewModel: ProfileViewModel = hiltViewModel()
+            ProfileScreen(
+                viewModel = viewModel,
+                onNavigateToHome = { navController.navigate("home") },
+                onNavigateToBooking = { navController.navigate("booking") },
             )
         }
 

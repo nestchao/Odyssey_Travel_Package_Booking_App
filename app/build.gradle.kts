@@ -82,6 +82,10 @@ dependencies {
     // For easy permission handling in Compose
     implementation("com.google.accompanist:accompanist-permissions:0.34.0")
 
+    implementation("androidx.hilt:hilt-navigation-compose:1.0.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
+    implementation("androidx.compose.material:material:1.5.4")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
