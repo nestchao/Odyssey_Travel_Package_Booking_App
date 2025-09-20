@@ -260,10 +260,14 @@ fun EnhancedHomeHeader(
                     }
 
                     val notificationViewModel: NotificationsViewModel = viewModel(
-                        factory = NotificationsViewModelFactory(NotificationRepository(
-                            dataSource = NotificationsDataSource(firestore = FirebaseFirestore.getInstance()),
-                            scheduledDataSource = ScheduledNotificationDataSource(firestore = FirebaseFirestore.getInstance()),
-                            context = LocalContext.current))
+                        factory = NotificationsViewModelFactory(
+                            NotificationRepository(
+                                NotificationsDataSource(FirebaseFirestore.getInstance()),
+                                ScheduledNotificationDataSource(FirebaseFirestore.getInstance()),
+                                LocalContext.current
+                            ),
+                            LocalContext.current
+                        )
                     )
                     val unreadCount by notificationViewModel.unreadCount.collectAsState()
 

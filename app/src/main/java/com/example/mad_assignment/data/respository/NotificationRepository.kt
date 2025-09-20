@@ -43,15 +43,8 @@ class NotificationRepository @Inject constructor(
     /**
      * Get scheduled notifications for the current user
      */
-    val scheduledNotifications: Flow<List<ScheduledNotification>> =
-        scheduledDataSource.getScheduledNotifications(currentUserId)
-
-    /**
-     * Get notifications for a specific user
-     */
-    fun getNotificationsForUser(userId: String): Flow<List<Notification>> {
-        return dataSource.getUserNotifications(userId)
-    }
+    val scheduledNotificationsFlow: Flow<List<ScheduledNotification>> =
+        scheduledDataSource.getScheduledNotifications(getCurrentUserId())
 
     /**
      * Create and add a new notification
@@ -103,21 +96,6 @@ class NotificationRepository @Inject constructor(
             } else {
                 saveResult
             }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Delete a scheduled notification
-     */
-    suspend fun deleteScheduledNotification(scheduledNotificationId: String): Result<Unit> {
-        return try {
-            // Cancel the WorkManager task
-            NotificationScheduler.cancelScheduledNotification(context, scheduledNotificationId)
-
-            // Remove from database
-            scheduledDataSource.deleteScheduledNotification(scheduledNotificationId)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -260,5 +238,59 @@ class NotificationRepository @Inject constructor(
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    /**
+     * Add notification for all users in the system
+     */
+    suspend fun addNotificationForAllUsers(notification: Notification): Result<List<String>> {
+        return try {
+            // Get all user IDs
+            val userIdsResult = dataSource.getAllUserIds()
+            if (userIdsResult.isFailure) {
+                return Result.failure(userIdsResult.exceptionOrNull() ?: Exception("Failed to get user IDs"))
+            }
+
+            val userIds = userIdsResult.getOrNull() ?: emptyList()
+            if (userIds.isEmpty()) {
+                return Result.success(emptyList())
+            }
+
+            // Add notification for each user
+            dataSource.addNotificationForUsers(notification, userIds)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Add a scheduled notification
+     */
+    suspend fun addScheduledNotification(scheduledNotification: ScheduledNotification): Result<String> {
+        return scheduledDataSource.addScheduledNotification(scheduledNotification, getCurrentUserId())
+    }
+
+    /**
+     * Delete a scheduled notification
+     */
+    suspend fun deleteScheduledNotification(notificationId: String): Result<Unit> {
+        return scheduledDataSource.deleteScheduledNotification(notificationId)
+    }
+
+    /**
+     * Get all scheduled notifications for current user
+     */
+    fun getScheduledNotifications(): Flow<List<ScheduledNotification>> {
+        return scheduledDataSource.getScheduledNotifications(getCurrentUserId())
+    }
+
+    /**
+     * Get current user ID - implement this based on your auth system
+     * For now, using a placeholder. Replace with your actual user ID logic.
+     */
+    private fun getCurrentUserId(): String {
+        // TODO: Replace with actual user authentication logic
+        // For example: FirebaseAuth.getInstance().currentUser?.uid ?: "default_user"
+        return "default_user" // Placeholder - replace with actual user ID
     }
 }

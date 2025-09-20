@@ -66,11 +66,14 @@ fun NotificationsScreen(
     onSendClick: () -> Unit,
     onNotificationClick: (notificationId: String) -> Unit,
     viewModel: NotificationsViewModel = viewModel(
-        factory = NotificationsViewModelFactory(NotificationRepository(
-            dataSource = NotificationsDataSource(firestore = FirebaseFirestore.getInstance()),
-            scheduledDataSource = ScheduledNotificationDataSource(firestore = FirebaseFirestore.getInstance()),
+        factory = NotificationsViewModelFactory(
+            repository = NotificationRepository(
+                dataSource = NotificationsDataSource(firestore = FirebaseFirestore.getInstance()),
+                scheduledDataSource = ScheduledNotificationDataSource(firestore = FirebaseFirestore.getInstance()),
+                context = LocalContext.current
+            ),
             context = LocalContext.current
-        ))
+        )
     ),
     modifier: Modifier = Modifier
         .safeDrawingPadding()

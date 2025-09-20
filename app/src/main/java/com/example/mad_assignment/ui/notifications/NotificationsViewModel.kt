@@ -1,15 +1,12 @@
 package com.example.mad_assignment.ui.notifications
 
-import androidx.compose.ui.platform.LocalContext
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
-import androidx.work.workDataOf
 import com.example.mad_assignment.data.model.Notification
 import com.example.mad_assignment.data.model.ScheduledNotification
 import com.example.mad_assignment.data.respository.NotificationRepository
-import com.example.mad_assignment.worker.NotificationWorker
+import com.example.mad_assignment.worker.NotificationScheduler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,10 +16,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
-import java.util.concurrent.TimeUnit
 
 class NotificationsViewModel(
-    private val repository: NotificationRepository
+    private val repository: NotificationRepository,
+    private val context: Context
 ) : ViewModel() {
     private val _filter = MutableStateFlow(NotificationFilter.ALL)
     val filter: StateFlow<NotificationFilter> = _filter.asStateFlow()
@@ -39,11 +36,16 @@ class NotificationsViewModel(
     private val _scheduledNotifications = MutableStateFlow<List<ScheduledNotification>>(emptyList())
     val scheduledNotifications: StateFlow<List<ScheduledNotification>> = _scheduledNotifications.asStateFlow()
 
+    init {
+        loadScheduledNotifications()
+    }
+
     fun loadSampleData() {
         viewModelScope.launch {
             repository.createSampleNotifications()
         }
     }
+
     val notifications: StateFlow<List<Notification>> = combine(
         repository.notifications,
         _filter,
@@ -184,13 +186,14 @@ class NotificationsViewModel(
     }
 
     /**
-     * Schedule a new notification
+     * Schedule a new notification (broadcasts to all users by default)
      */
     fun scheduleNotification(
         title: String,
         message: String,
         type: Notification.NotificationType,
-        scheduledTime: Long
+        scheduledTime: Long,
+        broadcastToAll: Boolean = true
     ) {
         viewModelScope.launch {
             val scheduledNotification = ScheduledNotification(
@@ -201,13 +204,19 @@ class NotificationsViewModel(
                 scheduledTime = scheduledTime
             )
 
-            val currentList = _scheduledNotifications.value.toMutableList()
-            currentList.add(scheduledNotification)
-            _scheduledNotifications.value = currentList.sortedBy { it.scheduledTime }
-
-            // TODO: Here you would integrate with Android's AlarmManager or WorkManager
-            // to actually schedule the notification delivery
-            scheduleNotificationDelivery(scheduledNotification)
+            // Add to repository/database
+            repository.addScheduledNotification(scheduledNotification)
+                .onSuccess {
+                    // Schedule using WorkManager to broadcast to all users
+                    NotificationScheduler.scheduleNotification(
+                        context = context,
+                        scheduledNotification = scheduledNotification,
+                        broadcastToAll = broadcastToAll
+                    )
+                }
+                .onFailure { exception ->
+                    _errorMessage.value = "Failed to schedule notification: ${exception.message}"
+                }
         }
     }
 
@@ -216,69 +225,37 @@ class NotificationsViewModel(
      */
     fun deleteScheduledNotification(id: String) {
         viewModelScope.launch {
-            val currentList = _scheduledNotifications.value.toMutableList()
-            currentList.removeAll { it.id == id }
-            _scheduledNotifications.value = currentList
+            // Remove from repository
+            repository.deleteScheduledNotification(id)
+                .onSuccess {
+                    // Update local list
+                    val currentList = _scheduledNotifications.value.toMutableList()
+                    currentList.removeAll { it.id == id }
+                    _scheduledNotifications.value = currentList
 
-            // Cancel the scheduled delivery
-            cancelScheduledNotificationDelivery(id)
+                    // Cancel the scheduled delivery
+                    NotificationScheduler.cancelScheduledNotification(context, id)
+                }
+                .onFailure { exception ->
+                    _errorMessage.value = "Failed to delete scheduled notification: ${exception.message}"
+                }
         }
     }
 
     /**
-     * Load scheduled notifications (in a real app, this would be from a database)
+     * Load scheduled notifications from repository
      */
     private fun loadScheduledNotifications() {
         viewModelScope.launch {
-            // For demo purposes, create some sample scheduled notifications
-            val sampleScheduled = listOf(
-                ScheduledNotification(
-                    id = UUID.randomUUID().toString(),
-                    title = "Weekly Report Reminder",
-                    message = "Don't forget to submit your weekly report by Friday",
-                    type = Notification.NotificationType.REMINDER,
-                    scheduledTime = System.currentTimeMillis() + (24 * 60 * 60 * 1000) // Tomorrow
-                ),
-                ScheduledNotification(
-                    id = UUID.randomUUID().toString(),
-                    title = "Payment Due",
-                    message = "Your monthly payment is due in 3 days",
-                    type = Notification.NotificationType.PAYMENT,
-                    scheduledTime = System.currentTimeMillis() + (3 * 24 * 60 * 60 * 1000) // In 3 days
-                )
-            )
-            _scheduledNotifications.value = sampleScheduled.sortedBy { it.scheduledTime }
+            repository.getScheduledNotifications().collect { scheduledNotifications ->
+                _scheduledNotifications.value = scheduledNotifications.sortedBy { it.scheduledTime }
+            }
         }
-    }
-
-    /**
-     * Schedule notification delivery using system scheduler
-     */
-    private fun scheduleNotificationDelivery(scheduledNotification: ScheduledNotification) {
-        // TODO: Implement with WorkManager
-        // Example:
-         val workRequest = OneTimeWorkRequestBuilder<NotificationWorker>()
-             .setInitialDelay(scheduledNotification.scheduledTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS)
-             .setInputData(workDataOf(
-                 "title" to scheduledNotification.title,
-                 "message" to scheduledNotification.message,
-                 "type" to scheduledNotification.type.name
-             ))
-             .build()
-         WorkManager.getInstance(context).enqueue(workRequest)
-    }
-
-    /**
-     * Cancel scheduled notification delivery
-     */
-    private fun cancelScheduledNotificationDelivery(id: String) {
-        // TODO: Implement with WorkManager
-         WorkManager.getInstance(context).cancelWorkById(UUID.fromString(id))
     }
 
     /**
      * Check for notifications that should be sent now and send them
-     * This would typically run periodically or be triggered by the scheduler
+     * This method is kept for manual processing if needed
      */
     fun processScheduledNotifications() {
         viewModelScope.launch {
@@ -288,24 +265,80 @@ class NotificationsViewModel(
             }
 
             toSend.forEach { scheduledNotification ->
-                // Create and send the actual notification
-                repository.createNotification(
+                // Create notification using repository method that broadcasts to all users
+                val notification = com.example.mad_assignment.data.model.Notification(
+                    id = UUID.randomUUID().toString(),
                     title = scheduledNotification.title,
                     message = scheduledNotification.message,
-                    type = scheduledNotification.type
+                    timestamp = java.sql.Timestamp(System.currentTimeMillis()),
+                    type = scheduledNotification.type,
+                    status = com.example.mad_assignment.data.model.Notification.Status.UNREAD
                 )
 
-                // Update the status to SENT
-                val updatedList = _scheduledNotifications.value.map {
-                    if (it.id == scheduledNotification.id) {
-                        it.copy(status = ScheduledNotification.ScheduleStatus.SENT)
-                    } else {
-                        it
+                repository.addNotificationForAllUsers(notification)
+                    .onSuccess {
+                        // Update the status to SENT
+                        val updatedList = _scheduledNotifications.value.map {
+                            if (it.id == scheduledNotification.id) {
+                                it.copy(status = ScheduledNotification.ScheduleStatus.SENT)
+                            } else {
+                                it
+                            }
+                        }
+                        _scheduledNotifications.value = updatedList
                     }
-                }
-                _scheduledNotifications.value = updatedList
             }
         }
+    }
+
+    /**
+     * Schedule a new notification with FCM support
+     */
+    fun scheduleNotification(
+        title: String,
+        message: String,
+        type: Notification.NotificationType,
+        scheduledTime: Long,
+        broadcastToAll: Boolean = true,
+        useFCM: Boolean = true // New parameter
+    ) {
+        viewModelScope.launch {
+            val scheduledNotification = ScheduledNotification(
+                id = UUID.randomUUID().toString(),
+                title = title,
+                message = message,
+                type = type,
+                scheduledTime = scheduledTime
+            )
+
+            // Add to repository/database
+            repository.addScheduledNotification(scheduledNotification)
+                .onSuccess {
+                    // Schedule using WorkManager to broadcast to all users
+                    NotificationScheduler.scheduleNotification(
+                        context = context,
+                        scheduledNotification = scheduledNotification,
+                        broadcastToAll = broadcastToAll,
+                        useFCM = useFCM
+                    )
+                }
+                .onFailure { exception ->
+                    _errorMessage.value = "Failed to schedule notification: ${exception.message}"
+                }
+        }
+    }
+
+    // Add this method to reschedule notifications on app start
+    fun reschedulePendingNotifications() {
+        viewModelScope.launch {
+            NotificationScheduler.rescheduleAllNotifications(context, getCurrentUserId())
+        }
+    }
+
+    private fun getCurrentUserId(): String {
+        // Implement your user authentication logic here
+        // This should return the current user's ID
+        return "current_user_id" // Replace with actual user ID retrieval
     }
 }
 

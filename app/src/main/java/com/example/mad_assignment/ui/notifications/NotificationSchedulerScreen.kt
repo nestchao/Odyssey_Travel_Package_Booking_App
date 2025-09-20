@@ -1,7 +1,9 @@
 package com.example.mad_assignment.ui.notifications
 
+import android.R.attr.alpha
 import android.app.TimePickerDialog
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,11 +13,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -83,9 +87,10 @@ fun NotificationSchedulerScreen(
         factory = NotificationsViewModelFactory(
             repository = NotificationRepository(
                 dataSource = NotificationsDataSource(firestore = FirebaseFirestore.getInstance()),
-                scheduledDataSource =  ScheduledNotificationDataSource(firestore = FirebaseFirestore.getInstance()),
+                scheduledDataSource = ScheduledNotificationDataSource(firestore = FirebaseFirestore.getInstance()),
                 context = LocalContext.current
-            )
+            ),
+            context = LocalContext.current
         )
     ),
     modifier: Modifier = Modifier
@@ -212,7 +217,7 @@ fun CreateScheduledNotificationDialog(
     var showTypeDropdown by rememberSaveable { mutableStateOf(false) }
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     var showTimePicker by rememberSaveable { mutableStateOf(false) }
-    var selectedDate by rememberSaveable { mutableStateOf<Date?>(null) }
+    var selectedDate by rememberSaveable { mutableStateOf<Date?>(Date()) }
     var selectedTime by rememberSaveable { mutableStateOf<Pair<Int, Int>?>(null) }
 
     val context = LocalContext.current
@@ -231,7 +236,7 @@ fun CreateScheduledNotificationDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .heightIn(min = 150.dp),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(
@@ -243,7 +248,8 @@ fun CreateScheduledNotificationDialog(
                 Text(
                     text = "Schedule Notification",
                     style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
                 )
 
                 // Title input
@@ -302,7 +308,10 @@ fun CreateScheduledNotificationDialog(
                 ) {
                     Button(
                         onClick = { showDatePicker = true },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 56.dp)
+                            .widthIn(min = 120.dp),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Icon(Icons.Default.CalendarToday, contentDescription = null)
@@ -312,7 +321,10 @@ fun CreateScheduledNotificationDialog(
 
                     Button(
                         onClick = { showTimePicker = true },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 56.dp)
+                            .widthIn(min = 120.dp),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Icon(Icons.Default.Schedule, contentDescription = null)
@@ -362,7 +374,12 @@ fun CreateScheduledNotificationDialog(
 
     // Date Picker Dialog
     if (showDatePicker) {
-        val datePickerState = rememberDatePickerState()
+//        val datePickerState = rememberDatePickerState()
+        val today = remember { System.currentTimeMillis() }
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = today
+        )
+
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
@@ -429,7 +446,7 @@ fun ScheduledNotificationCard(
             .padding(vertical = 4.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isPast) Color.Gray.copy(alpha = 0.1f) else Color.White
+            containerColor = Color.White
         )
     ) {
         Column(
@@ -445,7 +462,7 @@ fun ScheduledNotificationCard(
                         text = scheduledNotification.title,
                         fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.titleMedium,
-                        color = if (isPast) Color.Gray else Color.Black
+                        color = Color.Black
                     )
                     Text(
                         text = scheduledNotification.type.name,
@@ -453,17 +470,19 @@ fun ScheduledNotificationCard(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
-                IconButton(
-                    onClick = {
-                        onDelete(scheduledNotification.id)
-                        Toast.makeText(context, "Scheduled notification deleted", Toast.LENGTH_SHORT).show()
+                if (!isPast) {
+                    IconButton(
+                        onClick = {
+                            onDelete(scheduledNotification.id)
+                            Toast.makeText(context, "Scheduled notification deleted", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = Color.Red
+                        )
                     }
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Delete",
-                        tint = Color.Red
-                    )
                 }
             }
 
@@ -471,7 +490,7 @@ fun ScheduledNotificationCard(
                 text = scheduledNotification.message,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(vertical = 8.dp),
-                color = if (isPast) Color.Gray else Color.Black
+                color = Color.Black
             )
 
             Row(
@@ -482,14 +501,14 @@ fun ScheduledNotificationCard(
                 Text(
                     text = "Scheduled for: ${dateTimeFormatter.format(Date(scheduledNotification.scheduledTime))}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (isPast) Color.Gray else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 if (isPast) {
                     Text(
                         text = "SENT",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.Green,
+                        color = Color(0xFF388E3C),
                         fontWeight = FontWeight.Bold
                     )
                 } else {
