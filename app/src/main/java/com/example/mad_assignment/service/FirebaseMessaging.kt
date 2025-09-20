@@ -15,26 +15,17 @@ import com.google.firebase.messaging.RemoteMessage
 class FirebaseMessaging : FirebaseMessagingService() {
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
-        // Handle FCM messages here
         remoteMessage.data.let { data ->
             val title = data["title"] ?: "Notification"
             val message = data["message"] ?: "New message"
 
             // Show notification
             showNotification(title, message)
-
-            // Also add to local database if needed
-            addNotificationToLocalDatabase(title, message, data["type"])
         }
     }
 
-    override fun onNewToken(token: String) {
-        // Save the FCM token to Firestore for the current user
-        saveFCMTokenToFirestore(token)
-    }
-
     private fun showNotification(title: String, message: String) {
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
         // Create notification channel
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -63,14 +54,5 @@ class FirebaseMessaging : FirebaseMessagingService() {
             .build()
 
         notificationManager.notify(System.currentTimeMillis().toInt(), notification)
-    }
-
-    private fun addNotificationToLocalDatabase(title: String, message: String, type: String?) {
-        // Implement logic to add received notification to local database
-    }
-
-    private fun saveFCMTokenToFirestore(token: String) {
-        // Save the FCM token to Firestore for the current user
-        // This allows the server to send targeted notifications
     }
 }

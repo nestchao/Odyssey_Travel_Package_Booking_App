@@ -40,6 +40,7 @@ class NotificationWorker(
         const val KEY_SCHEDULED_ID = "scheduled_id"
         const val KEY_BROADCAST_TO_ALL = "broadcast_to_all"
         const val KEY_USE_FCM = "use_fcm"
+        const val KEY_TARGET_USER_ID = "target_user_id"
     }
 
     override suspend fun doWork(): Result {
@@ -50,7 +51,8 @@ class NotificationWorker(
                 val typeString = inputData.getString(KEY_TYPE) ?: "GENERAL"
                 val scheduledId = inputData.getString(KEY_SCHEDULED_ID) ?: return@withContext Result.failure()
                 val broadcastToAll = inputData.getBoolean(KEY_BROADCAST_TO_ALL, true)
-                val useFCM = inputData.getBoolean(KEY_USE_FCM, true) // Default to using FCM
+                val useFCM = inputData.getBoolean(KEY_USE_FCM, true)
+                val targetUserId = inputData.getString(KEY_TARGET_USER_ID) // Get target user ID
 
                 val type = try {
                     Notification.NotificationType.valueOf(typeString)
@@ -75,24 +77,28 @@ class NotificationWorker(
                     status = Notification.Status.UNREAD
                 )
 
-                // Send via FCM if enabled and broadcasting to all users
-                if (useFCM && broadcastToAll) {
-                    sendFCMNotificationToAll(title, message, type)
+                // Send via FCM if enabled
+                if (useFCM) {
+                    if (broadcastToAll) {
+                        sendFCMNotificationToAll(title, message, type)
+                    } else if (targetUserId != null) {
+                        sendFCMNotificationToUser(targetUserId, title, message, type)
+                    }
                 }
 
                 val createResult = if (broadcastToAll) {
-                    // Send to all users
                     notificationRepository.addNotificationForAllUsers(notification)
+                } else if (targetUserId != null) {
+                    // Send to specific user only
+                    notificationRepository.createNotificationForUser(notification, targetUserId)
                 } else {
-                    // Send to current user only
-                    notificationRepository.createNotification(title, message, type)
+                    val currentUserId = getCurrentUserId(applicationContext)
+                    notificationRepository.createNotificationForUser(notification, currentUserId)
                 }
 
                 if (createResult.isSuccess) {
-                    // Show system notification to current device user
                     showSystemNotification(title, message)
 
-                    // Update scheduled notification status to SENT
                     scheduledDataSource.updateScheduledNotificationStatus(
                         scheduledId,
                         ScheduledNotification.ScheduleStatus.SENT
@@ -109,26 +115,42 @@ class NotificationWorker(
         }
     }
 
-    private suspend fun sendFCMNotificationToAll(title: String, message: String, type: Notification.NotificationType) {
-        try {
-            // In a real app, you'd send this to your server which would broadcast to all users
-            // For now, we'll simulate by getting all user FCM tokens and sending
-            val allUserIds = getAdminUserIds() // Get admin users who can send notifications
-            val fcmTokens = getFCMTokensForUsers(allUserIds)
+    private fun getCurrentUserId(context: Context): String {
+        // Implement user authentication logic here TODO
+        // Return the current user's ID from SharedPreferences, Auth, etc.
+        val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+        return sharedPreferences.getString("user_id", "default_user_id") ?: "default_user_id"
+    }
 
-            // Send FCM to each user (in production, use topic messaging or server-side batch)
-            fcmTokens.forEach { token ->
-                sendFCMMessage(token, title, message, type)
+    // Add this method for sending FCM to specific user
+    private suspend fun sendFCMNotificationToUser(userId: String, title: String, message: String, type: Notification.NotificationType) {
+        try {
+            val userDoc = FirebaseFirestore.getInstance().collection("users").document(userId).get().await()
+            val fcmToken = userDoc.getString("fcmToken")
+
+            if (fcmToken != null && fcmToken.isNotBlank()) {
+                sendFCMMessage(fcmToken, title, message, type)
             }
         } catch (e: Exception) {
-            // Fall back to local delivery if FCM fails
             e.printStackTrace()
         }
     }
 
+    private suspend fun sendFCMNotificationToAll(title: String, message: String, type: Notification.NotificationType) {
+        try {
+            val allUserIds = getAdminUserIds() // Get admin users who can send notifications
+            val fcmTokens = getFCMTokensForUsers(allUserIds)
+
+            fcmTokens.forEach { token ->
+                sendFCMMessage(token, title, message, type)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    // TODO: Add this method to get admin user IDs from Firestore
     private suspend fun getAdminUserIds(): List<String> {
-        // Get users who have permission to receive/administer notifications
-        // This is a simplified version - in real app, query your users collection
         val db = FirebaseFirestore.getInstance()
         val snapshot = db.collection("users")
             .whereEqualTo("canReceiveNotifications", true)
@@ -155,8 +177,6 @@ class NotificationWorker(
     }
 
     private suspend fun sendFCMMessage(token: String, title: String, message: String, type: Notification.NotificationType) {
-        // In production, this should be done from your server
-        // This is a simplified client-side approach
         val messageData = mapOf(
             "title" to title,
             "message" to message,
@@ -164,8 +184,6 @@ class NotificationWorker(
             "click_action" to "FLUTTER_NOTIFICATION_CLICK"
         )
 
-        // Note: Client-side FCM sending is limited. For production, use a server.
-        // This is just for demonstration.
         try {
             FirebaseMessaging.getInstance().send(
                 com.google.firebase.messaging.RemoteMessage.Builder("$token@fcm.googleapis.com")
@@ -228,7 +246,6 @@ class NotificationWorker(
 }
 
 object NotificationScheduler {
-
     /**
      * Schedule a notification using WorkManager with FCM support
      */
@@ -236,40 +253,32 @@ object NotificationScheduler {
         context: Context,
         scheduledNotification: ScheduledNotification,
         broadcastToAll: Boolean = true,
-        useFCM: Boolean = true // New parameter for FCM
+        useFCM: Boolean = true,
+        targetUserId: String? = null
     ) {
         val delay = scheduledNotification.scheduledTime - System.currentTimeMillis()
+
+        val inputData = androidx.work.workDataOf(
+            NotificationWorker.KEY_TITLE to scheduledNotification.title,
+            NotificationWorker.KEY_MESSAGE to scheduledNotification.message,
+            NotificationWorker.KEY_TYPE to scheduledNotification.type.name,
+            NotificationWorker.KEY_SCHEDULED_ID to scheduledNotification.id,
+            NotificationWorker.KEY_BROADCAST_TO_ALL to broadcastToAll,
+            NotificationWorker.KEY_USE_FCM to useFCM,
+            NotificationWorker.KEY_TARGET_USER_ID to targetUserId
+        )
 
         if (delay > 0) {
             val workRequest = androidx.work.OneTimeWorkRequestBuilder<NotificationWorker>()
                 .setInitialDelay(delay, java.util.concurrent.TimeUnit.MILLISECONDS)
-                .setInputData(
-                    androidx.work.workDataOf(
-                        NotificationWorker.KEY_TITLE to scheduledNotification.title,
-                        NotificationWorker.KEY_MESSAGE to scheduledNotification.message,
-                        NotificationWorker.KEY_TYPE to scheduledNotification.type.name,
-                        NotificationWorker.KEY_SCHEDULED_ID to scheduledNotification.id,
-                        NotificationWorker.KEY_BROADCAST_TO_ALL to broadcastToAll,
-                        NotificationWorker.KEY_USE_FCM to useFCM // Pass FCM flag
-                    )
-                )
+                .setInputData(inputData)
                 .addTag("scheduled_notification_${scheduledNotification.id}")
                 .build()
 
             androidx.work.WorkManager.getInstance(context).enqueue(workRequest)
         } else {
-            // If time has already passed, execute immediately
             val workRequest = androidx.work.OneTimeWorkRequestBuilder<NotificationWorker>()
-                .setInputData(
-                    androidx.work.workDataOf(
-                        NotificationWorker.KEY_TITLE to scheduledNotification.title,
-                        NotificationWorker.KEY_MESSAGE to scheduledNotification.message,
-                        NotificationWorker.KEY_TYPE to scheduledNotification.type.name,
-                        NotificationWorker.KEY_SCHEDULED_ID to scheduledNotification.id,
-                        NotificationWorker.KEY_BROADCAST_TO_ALL to broadcastToAll,
-                        NotificationWorker.KEY_USE_FCM to useFCM
-                    )
-                )
+                .setInputData(inputData)
                 .addTag("scheduled_notification_${scheduledNotification.id}")
                 .build()
 

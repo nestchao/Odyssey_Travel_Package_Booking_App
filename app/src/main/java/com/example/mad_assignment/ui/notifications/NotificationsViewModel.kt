@@ -7,6 +7,7 @@ import com.example.mad_assignment.data.model.Notification
 import com.example.mad_assignment.data.model.ScheduledNotification
 import com.example.mad_assignment.data.respository.NotificationRepository
 import com.example.mad_assignment.worker.NotificationScheduler
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
 class NotificationsViewModel(
@@ -266,13 +268,13 @@ class NotificationsViewModel(
 
             toSend.forEach { scheduledNotification ->
                 // Create notification using repository method that broadcasts to all users
-                val notification = com.example.mad_assignment.data.model.Notification(
+                val notification = Notification(
                     id = UUID.randomUUID().toString(),
                     title = scheduledNotification.title,
                     message = scheduledNotification.message,
                     timestamp = java.sql.Timestamp(System.currentTimeMillis()),
                     type = scheduledNotification.type,
-                    status = com.example.mad_assignment.data.model.Notification.Status.UNREAD
+                    status = Notification.Status.UNREAD
                 )
 
                 repository.addNotificationForAllUsers(notification)
@@ -300,7 +302,7 @@ class NotificationsViewModel(
         type: Notification.NotificationType,
         scheduledTime: Long,
         broadcastToAll: Boolean = true,
-        useFCM: Boolean = true // New parameter
+        useFCM: Boolean = true
     ) {
         viewModelScope.launch {
             val scheduledNotification = ScheduledNotification(
@@ -328,17 +330,98 @@ class NotificationsViewModel(
         }
     }
 
-    // Add this method to reschedule notifications on app start
     fun reschedulePendingNotifications() {
         viewModelScope.launch {
             NotificationScheduler.rescheduleAllNotifications(context, getCurrentUserId())
         }
     }
 
+    // TODO: Replace with actual user ID retrieval
     private fun getCurrentUserId(): String {
         // Implement your user authentication logic here
         // This should return the current user's ID
         return "current_user_id" // Replace with actual user ID retrieval
+    }
+
+    /**
+     * Schedule a notification (can broadcast to all or send to specific user)
+     */
+    fun scheduleNotification(
+        title: String,
+        message: String,
+        type: Notification.NotificationType,
+        scheduledTime: Long,
+        broadcastToAll: Boolean = true,
+        useFCM: Boolean = true,
+        targetUserId: String? = null
+    ) {
+        viewModelScope.launch {
+            val scheduledNotification = ScheduledNotification(
+                id = UUID.randomUUID().toString(),
+                title = title,
+                message = message,
+                type = type,
+                scheduledTime = scheduledTime
+            )
+
+            repository.addScheduledNotification(scheduledNotification)
+                .onSuccess {
+                    // Schedule using WorkManager
+                    NotificationScheduler.scheduleNotification(
+                        context = context,
+                        scheduledNotification = scheduledNotification,
+                        broadcastToAll = broadcastToAll,
+                        useFCM = useFCM,
+                        targetUserId = targetUserId
+                    )
+                }
+                .onFailure { exception ->
+                    _errorMessage.value = "Failed to schedule notification: ${exception.message}"
+                }
+        }
+    }
+
+    /**
+     * Send a notification to a specific user
+     */
+    fun sendUserNotification(
+        userId: String,
+        title: String,
+        message: String,
+        type: Notification.NotificationType = Notification.NotificationType.GENERAL
+    ) {
+        viewModelScope.launch {
+            val notification = Notification(
+                id = UUID.randomUUID().toString(),
+                title = title,
+                message = message,
+                timestamp = java.sql.Timestamp(System.currentTimeMillis()),
+                type = type,
+                status = Notification.Status.UNREAD
+            )
+
+            repository.createNotificationForUser(notification, userId)
+                .onSuccess {
+                    sendFCMNotificationToUser(userId, title, message, type)
+                }
+                .onFailure { exception ->
+                    _errorMessage.value = "Failed to send notification: ${exception.message}"
+                }
+        }
+    }
+
+    // Send FCM to specific user
+    private suspend fun sendFCMNotificationToUser(userId: String, title: String, message: String, type: Notification.NotificationType) {
+        try {
+            val userDoc = FirebaseFirestore.getInstance().collection("users").document(userId).get().await()
+            val fcmToken = userDoc.getString("fcmToken")
+
+            if (fcmToken != null && fcmToken.isNotBlank()) {
+                println("Would send FCM to user $userId with token $fcmToken")
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
 

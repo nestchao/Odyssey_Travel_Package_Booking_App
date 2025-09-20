@@ -18,7 +18,7 @@ class NotificationRepository @Inject constructor(
     private val scheduledDataSource: ScheduledNotificationDataSource,
     private val context: Context
 ) {
-    private var currentUserId: String = "1" // set after login
+    private var currentUserId: String = "1" // TODO: GET CURRENT USER ID
 
     /**
      * Set the current user ID (call this after authentication)
@@ -241,29 +241,6 @@ class NotificationRepository @Inject constructor(
     }
 
     /**
-     * Add notification for all users in the system
-     */
-    suspend fun addNotificationForAllUsers(notification: Notification): Result<List<String>> {
-        return try {
-            // Get all user IDs
-            val userIdsResult = dataSource.getAllUserIds()
-            if (userIdsResult.isFailure) {
-                return Result.failure(userIdsResult.exceptionOrNull() ?: Exception("Failed to get user IDs"))
-            }
-
-            val userIds = userIdsResult.getOrNull() ?: emptyList()
-            if (userIds.isEmpty()) {
-                return Result.success(emptyList())
-            }
-
-            // Add notification for each user
-            dataSource.addNotificationForUsers(notification, userIds)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
      * Add a scheduled notification
      */
     suspend fun addScheduledNotification(scheduledNotification: ScheduledNotification): Result<String> {
@@ -284,13 +261,22 @@ class NotificationRepository @Inject constructor(
         return scheduledDataSource.getScheduledNotifications(getCurrentUserId())
     }
 
+    // TODO: Replace with actual user authentication logic
     /**
      * Get current user ID - implement this based on your auth system
      * For now, using a placeholder. Replace with your actual user ID logic.
      */
     private fun getCurrentUserId(): String {
-        // TODO: Replace with actual user authentication logic
-        // For example: FirebaseAuth.getInstance().currentUser?.uid ?: "default_user"
-        return "default_user" // Placeholder - replace with actual user ID
+        // For example: FirebaseAuth.getInstance().currentUser?.uid ?: "default_user" / BOON YEW CODE
+        return "default_user" // Placeholder
+    }
+
+    suspend fun createNotificationForUser(notification: Notification, userId: String): Result<String> {
+        return dataSource.addNotification(notification, userId)
+    }
+
+    suspend fun addNotificationForAllUsers(notification: Notification): Result<List<String>> {
+        val userIds = dataSource.getAllUserIds().getOrElse { emptyList() }
+        return dataSource.addNotificationForUsers(notification, userIds)
     }
 }

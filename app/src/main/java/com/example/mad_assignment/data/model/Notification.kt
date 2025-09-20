@@ -11,9 +11,7 @@ data class Notification(
     val message: String,
     val timestamp: Timestamp,
     val type: NotificationType,
-    val status: Status = Status.UNREAD,
-    val sender: Sender = Sender.SYSTEM,
-    val receiver: Receiver = Receiver.USER
+    val status: Status = Status.UNREAD
 ) {
     enum class Status {
         ARCHIVED, READ, UNREAD, DELETED
@@ -22,9 +20,6 @@ data class Notification(
     enum class NotificationType {
         WELCOME, REMINDER, PAYMENT, ANNOUNCEMENT, PACKAGE, GENERAL
     }
-
-    enum class Sender { SYSTEM }
-    enum class Receiver { USER }
 
     fun getFormattedTime(): String {
         val now = System.currentTimeMillis()
@@ -40,7 +35,4 @@ data class Notification(
         }
     }
 }
-
-// schedular (schedule notification send to users)
-// sender, receiver
 
