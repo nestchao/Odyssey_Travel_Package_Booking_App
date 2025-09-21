@@ -1,5 +1,3 @@
-// In file: /ui/AppNavigation.kt
-
 package com.example.mad_assignment.ui
 
 import androidx.compose.foundation.layout.*
@@ -19,16 +17,25 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.example.mad_assignment.ui.explore.ExploreScreen
+import com.example.mad_assignment.ui.forgetpassword.ForgotPasswordScreen
+import com.example.mad_assignment.ui.forgetpassword.ForgotPasswordViewModel
 import com.example.mad_assignment.ui.home.EnhancedBottomNavigationBar
 import com.example.mad_assignment.ui.home.HomeScreen
 import com.example.mad_assignment.ui.packagedetail.PackageDetailScreen
+import com.example.mad_assignment.ui.profile.ProfileScreen
+import com.example.mad_assignment.ui.profile.ProfileViewModel
 import com.example.mad_assignment.ui.search.SearchScreen
+import com.example.mad_assignment.ui.signin.SignInScreen
+import com.example.mad_assignment.ui.signin.SignInViewModel
+import com.example.mad_assignment.ui.signup.SignUpScreen
+import com.example.mad_assignment.ui.signup.SignUpViewModel
 
 @Composable
 fun AppNavigation(){
@@ -36,27 +43,90 @@ fun AppNavigation(){
     val configuration = LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
 
-    val startDestination = if (isTablet) "tablet_main" else "phone_main"
+    val mainDestination = if (isTablet) "tablet_main" else "phone_main"
 
-    NavHost(navController = navController, startDestination = startDestination) {
+    NavHost(navController = navController, startDestination = "signin") {
+
+        composable("signin") {
+            val viewModel: SignInViewModel = hiltViewModel()
+            SignInScreen(
+                viewModel = viewModel,
+                onSignInSuccess = { user ->
+
+                    navController.navigate(mainDestination) {
+                        popUpTo("signin") { inclusive = true }
+                    }
+                },
+                onNavigateToSignUp = {
+
+                    navController.navigate("signup")
+                },
+                onForgotPassword = {
+                    navController.navigate("forgot_password")
+                }
+            )
+        }
+
+        // Sign Up
+        composable("signup") {
+            val viewModel: SignUpViewModel = hiltViewModel()
+            SignUpScreen(
+                viewModel = viewModel,
+                onSignUpSuccess = { user ->
+                    // Navigate to main app after successful sign up
+                    navController.navigate(mainDestination) {
+                        // Clear the back stack so user can't go back to signup
+                        popUpTo("signin") { inclusive = true }
+                    }
+                },
+                onNavigateToSignIn = {
+                    // Go back to sign in screen by popping the back stack
+                    navController.navigate("signin")
+                }
+            )
+        }
+
+        // Forgot Password
+        composable("forgot_password") {
+            val viewModel: ForgotPasswordViewModel = hiltViewModel()
+            ForgotPasswordScreen(
+                viewModel = viewModel,
+                onNavigateBack = {
+                    navController.navigate("signin")
+                },
+                onResetSuccess = {
+                    navController.navigate("signin")
+                }
+            )
+        }
+
+        // Main App Content for Phones
         composable("phone_main") {
             PhoneContainerScreen(
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
-                onNavigateToSearch = { navController.navigate("search") }
+                onNavigateToSearch = { navController.navigate("search") },
+                onSignOut = { navController.navigate("signin") }
             )
         }
+
+        // Main App Content for Tablets
         composable("tablet_main") {
             TabletContainerScreen(
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
-                onNavigateToSearch = { navController.navigate("search") }
+                onNavigateToSearch = { navController.navigate("search") },
+                onSignOut = { navController.navigate("signin") }
             )
         }
+
+        // Detail Screen (accessible from main content)
         composable(
             route = "detail/{packageId}",
             arguments = listOf(navArgument("packageId") { type = NavType.StringType })
         ){
             PackageDetailScreen(onNavigateBack = { navController.popBackStack() })
         }
+
+        // Search Screen (accessible from main content)
         composable(route = "search"){
             SearchScreen(
                 onNavigateBack = { navController.popBackStack() },
@@ -66,11 +136,13 @@ fun AppNavigation(){
     }
 }
 
+
 // --- Container for the Phone Layout ---
 @Composable
 private fun PhoneContainerScreen(
     onNavigateToDetail: (String) -> Unit,
-    onNavigateToSearch: () -> Unit
+    onNavigateToSearch: () -> Unit,
+    onSignOut: () -> Unit
 ) {
     val contentNavController = rememberNavController()
     Scaffold(
@@ -88,8 +160,16 @@ private fun PhoneContainerScreen(
                 )
             }
             composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
-            composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
-            composable("profile") { PlaceholderScreen(screenName = "Profile") }
+            composable("bookings") { PlaceholderScreen(screenName = "Bookings") } // Assuming you have a bookings screen
+
+            // Integrated Profile Screen
+            composable("profile") {
+                val viewModel: ProfileViewModel = hiltViewModel()
+                ProfileScreen(
+                    viewModel = viewModel,
+                    onSignOut = onSignOut
+                )
+            }
         }
     }
 }
@@ -98,7 +178,8 @@ private fun PhoneContainerScreen(
 @Composable
 private fun TabletContainerScreen(
     onNavigateToDetail: (String) -> Unit,
-    onNavigateToSearch: () -> Unit
+    onNavigateToSearch: () -> Unit,
+    onSignOut: () -> Unit
 ) {
     val contentNavController = rememberNavController()
     val configuration = LocalConfiguration.current
@@ -106,7 +187,7 @@ private fun TabletContainerScreen(
 
     if (isLandscape) {
         Row {
-            TabletSideNavigation( // This function now lives below in this same file
+            TabletSideNavigation(
                 modifier = Modifier.width(240.dp).fillMaxHeight(),
                 navController = contentNavController
             )
@@ -124,32 +205,28 @@ private fun TabletContainerScreen(
                 composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
                 composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
                 composable("favorites") { PlaceholderScreen(screenName = "Favorites") }
-                composable("profile") { PlaceholderScreen(screenName = "Profile") }
                 composable("settings") { PlaceholderScreen(screenName = "Settings") }
+
+                // Integrated Profile Screen
+                composable("profile") {
+                    val viewModel: ProfileViewModel = hiltViewModel()
+                    ProfileScreen(
+                        viewModel = viewModel,
+                        onSignOut = onSignOut
+                    )
+                }
             }
         }
     } else {
-        Scaffold(
-            bottomBar = { EnhancedBottomNavigationBar(navController = contentNavController) }
-        ) { innerPadding ->
-            NavHost(
-                navController = contentNavController,
-                startDestination = "home",
-                modifier = Modifier.padding(innerPadding)
-            ) {
-                composable("home") {
-                    HomeScreen(
-                        onPackageClick = onNavigateToDetail,
-                        onNavigateToSearch = onNavigateToSearch
-                    )
-                }
-                composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
-                composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
-                composable("profile") { PlaceholderScreen(screenName = "Profile") }
-            }
-        }
+        // Portrait tablet uses the same layout as the phone
+        PhoneContainerScreen(
+            onNavigateToDetail = onNavigateToDetail,
+            onNavigateToSearch = onNavigateToSearch,
+            onSignOut = onSignOut
+        )
     }
 }
+
 
 // --- Helper Data Class for Side Navigation ---
 private data class SideNavItem(
@@ -188,7 +265,9 @@ private fun TabletSideNavigation(
                 .padding(16.dp)
         ) {
             Card(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                 ),
@@ -240,7 +319,9 @@ private fun TabletSideNavigation(
                             Color.Transparent
                     ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(

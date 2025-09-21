@@ -8,6 +8,8 @@ import javax.inject.Inject
 class UserRepository @Inject constructor(
     private val userDataSource: UserDataSource
 ) {
+
+
     // ✅ Get all users
     suspend fun getAllUsers(): List<User> {
         val result = userDataSource.getAllUsers()
@@ -49,4 +51,7 @@ class UserRepository @Inject constructor(
         val result = userDataSource.getUsersByIds(ids)
         return result.getOrElse { emptyList() }
     }
+
+
+
 }

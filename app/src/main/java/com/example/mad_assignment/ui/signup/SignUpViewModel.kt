@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mad_assignment.data.model.User
 import com.example.mad_assignment.data.model.UserType
+import com.example.mad_assignment.data.repository.ProfilePicRepository
 import com.example.mad_assignment.data.repository.UserRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
@@ -20,16 +21,15 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SignUpViewModel @Inject constructor(
-    // Dependencies are now provided here by Hilt
     private val userRepository: UserRepository,
+    private val profilePicRepository: ProfilePicRepository,
     private val auth: FirebaseAuth
 ) : ViewModel() { // Removed the empty parentheses
 
     private val _uiState = MutableStateFlow<SignUpUiState>(SignUpUiState.Idle())
     val uiState: StateFlow<SignUpUiState> = _uiState.asStateFlow()
 
-    // --- Input Update Functions ---
-    // (Your existing onNameChange, onEmailChange, etc., are all correct)
+
 
     fun onNameChange(name: String) {
         _uiState.update { currentState ->
@@ -101,8 +101,6 @@ class SignUpViewModel @Inject constructor(
         }
     }
 
-    // --- Core Sign-Up Logic ---
-
     fun signUp() {
         val currentState = _uiState.value
         if (currentState !is SignUpUiState.Idle && currentState !is SignUpUiState.Error) return
@@ -121,15 +119,13 @@ class SignUpViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                // 1. Create user in Firebase Auth
+
                 val authResult = auth.createUserWithEmailAndPassword(email.trim(), password).await()
                 val firebaseUser = authResult.user ?: throw Exception("Firebase user not found after creation.")
 
-                // (Optional) Update display name in Firebase Auth profile
                 val profileUpdates = UserProfileChangeRequest.Builder().setDisplayName(name).build()
                 firebaseUser.updateProfile(profileUpdates).await()
 
-                // 2. Create the User object for Firestore
                 val newUser = User(
                     userID = firebaseUser.uid,
                     userName = name,
@@ -138,8 +134,12 @@ class SignUpViewModel @Inject constructor(
                     userType = UserType.CUSTOMER
                 )
 
-                // 3. Save the user object to Firestore via the repository
                 userRepository.createUser(newUser)
+
+                profilePicRepository.setProfilePicture(
+                    userId = firebaseUser.uid,
+                    base64Data = "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAKVSURBVHhe7ZpdaxNBFIZFg14EAx48eBE8eBE8eBFE8eA/8Cf4CSx48eBFEERfPZUEi168iAY9iEaiadPc2QySSbZJdjYzb9Jkkn1n3p+dtDOd2UQiERERERERkYaqg2PWRQ3Yp2P05IAnV01Bf3eC/t5pSNYPeP78fGzYnU78+v0+L226T9d1/B4MBk/6+gHw+fyl3d/fw/v9Ppc1WcE2G4zJk48/T51OR/b5fP6y4yM/T5w9Y+a0M2bOWIZsChsYDIaYnJykv+dgMBhifHx8S+a0M2bOWIZsCiOTk5PsdDq+k+nk5CSbzaazZbYxY6kMjI6OdnVdJ2NifD5fsdvtZstsbLy/f0xMTk6yWq3msm02m2Xv3p2dna3JbC4vAGDXdXZ2trDZbLbb7aS93+/z+Xxubm4+NzDqun7a5/NJrVYbDocDAFxdXb1abU5PTwMAfPz8xMvLi6/X66urq2OxWJaamsIA8Pl89vj4mE6nk9FoNJfLHR4eAgA8PDyktrbW09MTiUSi1+t1Oh1B3mg0ms/nAYD5+XlWV1dZLBZvb2+pVCppa2sLAPj7+yubzVqtVq1Wy2q1urq6CgDg6ekpDRwOh2q1mvP5/OzsLAaDwdPTU97e3tJutwHA8fFxLik0NTUFAHB1dZWpqSnW6/X9/X0Oh4Oenh4Gg4FSqfT09BQAgI+Pj1Qqlaenpzw8PPB+v4vFotVqAQD4+vqKx+Px+Xw+n89qtXq8vARrt9utVqv1ejuOAEql0mq1ymw2W63W8fExvt/vfr9/cHCQi4sLptNpOp1+cHAAAFitVrlcLqPRaDQazWbz4eEh5eXlPR5PzWaz2Ww2m81mMxgMBgMAgImJCRaLRavVms1my+XyysoKptPp6enp09NTlmS2MWOpDImIiIiIiIiIiIiIiIiI1Ab/AfwSwbGEPYLxAAAAAElFTSuQmCC"
+                )
 
                 _uiState.value = SignUpUiState.Success(user = newUser)
 

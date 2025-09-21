@@ -2,6 +2,7 @@ package com.example.mad_assignment.ui.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.mad_assignment.data.repository.ProfilePicRepository
 import com.example.mad_assignment.data.repository.UserRepository
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,84 +16,71 @@ import javax.inject.Inject
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val userRepository: UserRepository,
+    private val profilePictureRepository: ProfilePicRepository,
     private val auth: FirebaseAuth
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ProfileUiState>(ProfileUiState.Loading())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
+
     init {
         loadProfile()
     }
 
     fun loadProfile() {
-        val currentUser = auth.currentUser
-        if (currentUser == null) {
-            _uiState.value = ProfileUiState.Error(
-                message = "User not authenticated"
-            )
-            return
-        }
-
-        _uiState.value = ProfileUiState.Loading()
-
         viewModelScope.launch {
+            _uiState.value = ProfileUiState.Loading()
             try {
-                val user = userRepository.getUserById(currentUser.uid)
-                if (user != null) {
-                    _uiState.value = ProfileUiState.Success(user = user)
-                } else {
-                    _uiState.value = ProfileUiState.Error(
-                        message = "User profile not found"
-                    )
-                }
+                // Get the user ID first
+                val userId = auth.currentUser?.uid
+                    ?: throw IllegalStateException("User is not authenticated.")
+
+                // Fetch the user, and throw an error if it's not found
+                val user = userRepository.getUserById(userId)
+                    ?: throw IllegalStateException("User profile not found in database.")
+
+                // Fetch the profile picture, and throw an error if it's not found
+                val profilePic = profilePictureRepository.getProfilePicture(userId)
+                    ?: throw IllegalStateException("Profile picture not found in database.")
+
+                // Only create the Success state if BOTH were found successfully
+                _uiState.value = ProfileUiState.Success(user, profilePic)
+
             } catch (e: Exception) {
-                _uiState.value = ProfileUiState.Error(
-                    message = "Failed to load profile: ${e.message ?: "Unknown error"}"
-                )
+                _uiState.value = ProfileUiState.Error("Failed to load profile: ${e.message}")
             }
         }
     }
 
-    fun refreshProfile() {
-        val currentUser = auth.currentUser
-        if (currentUser == null) {
-            _uiState.value = ProfileUiState.Error(
-                message = "User not authenticated"
-            )
-            return
-        }
-
-        _uiState.update { currentState ->
-            when (currentState) {
-                is ProfileUiState.Success -> currentState.copy(isRefreshing = true)
-                is ProfileUiState.Error -> ProfileUiState.Loading(isRefreshing = true)
-                is ProfileUiState.Loading -> currentState.copy(isRefreshing = true)
-            }
-        }
-
+    fun updateUserProfilePicture(base64Data: String) {
         viewModelScope.launch {
-            try {
-                val user = userRepository.getUserById(currentUser.uid)
-                if (user != null) {
-                    _uiState.value = ProfileUiState.Success(
-                        user = user,
-                        isRefreshing = false
-                    )
-                } else {
-                    _uiState.value = ProfileUiState.Error(
-                        message = "User profile not found",
-                        isRefreshing = false
-                    )
+            val currentState = _uiState.value
+            if (currentState is ProfileUiState.Success) {
+                try {
+                    // Get the userID directly from the 'user' object in the state
+                    val userId = currentState.user.userID
+                    val success = profilePictureRepository.setProfilePicture(userId, base64Data)
+
+                    if (success) {
+                        // Reload the whole profile to ensure data is consistent
+                        loadProfile()
+                    } else {
+                        // Pass the old data along with the error
+                        _uiState.value = ProfileUiState.Error(
+                            message = "Failed to save picture.",
+                            user = currentState.user,
+                            ProfilePic = currentState.ProfilePic
+                        )
+                    }
+                } catch (e: Exception) {
+                    _uiState.value = ProfileUiState.Error("An error occurred while saving.")
                 }
-            } catch (e: Exception) {
-                _uiState.value = ProfileUiState.Error(
-                    message = "Failed to refresh profile: ${e.message ?: "Unknown error"}",
-                    isRefreshing = false
-                )
             }
         }
     }
+
+
 
     fun signOut() {
         auth.signOut()
@@ -100,33 +88,28 @@ class ProfileViewModel @Inject constructor(
     }
 
     fun updateProfile(updates: Map<String, Any>) {
-        val userId = auth.currentUser?.uid
-        if (userId == null) {
-            _uiState.value = ProfileUiState.Error("Cannot update: User not authenticated")
-            return
-        }
+        val userId = auth.currentUser?.uid ?: return // Early exit if not logged in
+
+        val originalState = _uiState.value as? ProfileUiState.Success
 
         viewModelScope.launch {
             try {
                 val success = userRepository.updateUser(userId, updates)
                 if (success) {
-                    // Re-fetch user data from the source of truth to ensure consistency.
-                    val updatedUser = userRepository.getUserById(userId)
-                    if (updatedUser != null) {
-                        _uiState.value = ProfileUiState.Success(user = updatedUser)
-                    } else {
-                        _uiState.value = ProfileUiState.Error(message = "Could not refresh profile after update.")
-                    }
+                    // The best practice is to reload everything from the source of truth.
+                    loadProfile()
                 } else {
                     _uiState.value = ProfileUiState.Error(
                         message = "Failed to update profile.",
-                        user = (uiState.value as? ProfileUiState.Success)?.user
+                        user = originalState?.user,
+                        ProfilePic = originalState?.ProfilePic
                     )
                 }
             } catch (e: Exception) {
                 _uiState.value = ProfileUiState.Error(
                     message = "Failed to update profile: ${e.message ?: "Unknown error"}",
-                    user = (uiState.value as? ProfileUiState.Success)?.user
+                    user = originalState?.user,
+                    ProfilePic = originalState?.ProfilePic
                 )
             }
         }
@@ -134,15 +117,12 @@ class ProfileViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { currentState ->
-            when (currentState) {
-                is ProfileUiState.Error -> {
-                    if (currentState.user != null) {
-                        ProfileUiState.Success(user = currentState.user)
-                    } else {
-                        ProfileUiState.Loading()
-                    }
-                }
-                else -> currentState
+            if (currentState is ProfileUiState.Error) {
+                // If we have old data, we can show a loading state that holds that old data
+                // to prevent the screen from blinking empty.
+                ProfileUiState.Loading(ProfilePic = currentState.ProfilePic)
+            } else {
+                currentState
             }
         }
     }

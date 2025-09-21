@@ -1,35 +1,34 @@
 package com.example.mad_assignment.ui.profile
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
-import androidx.compose.material.pullrefresh.pullRefresh
-import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.mad_assignment.util.toDataUri
 
-@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel(),
-    onNavigateToHome: () -> Unit = {},
-    onNavigateToBooking: () -> Unit = {},
     onNavigateToAccountDetails: () -> Unit = {},
     onNavigateToWishlist: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
@@ -40,29 +39,18 @@ fun ProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    val pullRefreshState = rememberPullRefreshState(
-        refreshing = when (val state = uiState) {
-            is ProfileUiState.Success -> state.isRefreshing
-            is ProfileUiState.Error -> state.isRefreshing
-            is ProfileUiState.Loading -> state.isRefreshing
-        },
-        onRefresh = { viewModel.refreshProfile() }
-    )
-
-    Box(modifier = Modifier.pullRefresh(pullRefreshState)) {
+    Box(modifier = Modifier.fillMaxSize()) {
         when (val state = uiState) {
             is ProfileUiState.Loading -> {
-                if (!state.isRefreshing) {
-                    LoadingScreen()
-                }
+                LoadingScreen()
             }
             is ProfileUiState.Error -> {
-                if (state.user != null) {
-                    // Show profile with error snackbar
+                if (state.user != null && state.ProfilePic != null) {
                     ProfileContent(
-                        uiState = ProfileUiState.Success(user = state.user),
-                        onNavigateToHome = onNavigateToHome,
-                        onNavigateToBooking = onNavigateToBooking,
+                        uiState = ProfileUiState.Success(
+                            user = state.user,
+                            ProfilePic = state.ProfilePic
+                        ),
                         onNavigateToAccountDetails = onNavigateToAccountDetails,
                         onNavigateToWishlist = onNavigateToWishlist,
                         onNavigateToSettings = onNavigateToSettings,
@@ -75,10 +63,7 @@ fun ProfileScreen(
                         }
                     )
 
-                    // Show error snackbar
                     LaunchedEffect(state.message) {
-                        // You can show a snackbar here
-                        // snackbarHostState.showSnackbar(state.message)
                         viewModel.clearError()
                     }
                 } else {
@@ -91,8 +76,6 @@ fun ProfileScreen(
             is ProfileUiState.Success -> {
                 ProfileContent(
                     uiState = state,
-                    onNavigateToHome = onNavigateToHome,
-                    onNavigateToBooking = onNavigateToBooking,
                     onNavigateToAccountDetails = onNavigateToAccountDetails,
                     onNavigateToWishlist = onNavigateToWishlist,
                     onNavigateToSettings = onNavigateToSettings,
@@ -106,24 +89,12 @@ fun ProfileScreen(
                 )
             }
         }
-
-        PullRefreshIndicator(
-            refreshing = when (val state = uiState) {
-                is ProfileUiState.Success -> state.isRefreshing
-                is ProfileUiState.Error -> state.isRefreshing
-                is ProfileUiState.Loading -> state.isRefreshing
-            },
-            state = pullRefreshState,
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
     }
 }
 
 @Composable
 private fun ProfileContent(
     uiState: ProfileUiState.Success,
-    onNavigateToHome: () -> Unit,
-    onNavigateToBooking: () -> Unit,
     onNavigateToAccountDetails: () -> Unit,
     onNavigateToWishlist: () -> Unit,
     onNavigateToSettings: () -> Unit,
@@ -132,9 +103,13 @@ private fun ProfileContent(
     onNavigateToRecentlyViewed: () -> Unit,
     onSignOut: () -> Unit
 ) {
+    val scrollState = rememberScrollState()
+    val imageBitmap = base64ToImageBitmap(uiState.ProfilePic.profilePictureBase64)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .background(Color.White)
             .padding(16.dp)
     ) {
@@ -162,32 +137,55 @@ private fun ProfileContent(
                     .padding(24.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Profile Image Placeholder
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(Color.White),
-                    contentAlignment = Alignment.Center
+                // Profile Section
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.weight(1f)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(76.dp)
+                            .size(90.dp)
                             .clip(CircleShape)
-                            .background(Color.White)
+                            .background(Color.LightGray),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (imageBitmap != null) {
+                            Image(
+                                bitmap = imageBitmap,
+                                contentDescription = "Profile Picture",
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.AccountCircle,
+                                contentDescription = "Default Profile Icon",
+                                tint = Color.Gray,
+                                modifier = Modifier.size(60.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Username with character limit
+                    Text(
+                        text = uiState.shortDisplayName,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.Black,
+                        maxLines = 1
                     )
+
+                    // Show truncated indicator if name is too long
+                    if (uiState.isNameTruncated) {
+                        Text(
+                            text = "...",
+                            fontSize = 14.sp,
+                            color = Color.Gray,
+                            modifier = Modifier.offset(y = (-4).dp)
+                        )
+                    }
                 }
-
-                Spacer(modifier = Modifier.width(24.dp))
-
-                // Username
-                Text(
-                    text = uiState.displayName,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.Black,
-                    modifier = Modifier.weight(1f)
-                )
 
                 // Stats Column
                 Column(
@@ -262,11 +260,6 @@ private fun ProfileContent(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Bottom Navigation
-        BottomNavigationBar(
-            onNavigateToHome = onNavigateToHome,
-            onNavigateToBooking = onNavigateToBooking
-        )
     }
 }
 
@@ -331,32 +324,36 @@ fun ProfileStat(number: String, label: String) {
 fun QuickActionItem(icon: ImageVector, title: String, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .width(80.dp)
-            .clickable { onClick() }
+        modifier = Modifier.width(80.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(Color.White),
-            contentAlignment = Alignment.Center
+        Card(
+            onClick = onClick,
+            shape = CircleShape,
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            modifier = Modifier.size(56.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                tint = Color.Black,
-                modifier = Modifier.size(24.dp)
-            )
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = Color.Black,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
         Text(
             text = title,
-            fontSize = 12.sp,
+            fontSize = 11.sp,
             color = Color.Black,
             modifier = Modifier.padding(top = 8.dp)
         )
     }
 }
+
 
 @Composable
 fun MenuItemRow(
@@ -402,80 +399,13 @@ fun MenuItemRow(
     }
 }
 
-@Composable
-fun BottomNavigationBar(
-    onNavigateToHome: () -> Unit,
-    onNavigateToBooking: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            BottomNavItem(
-                icon = Icons.Filled.Home,
-                label = "Home",
-                isSelected = false,
-                onClick = onNavigateToHome
-            )
-            BottomNavItem(
-                icon = Icons.Filled.Book,
-                label = "Booking",
-                isSelected = false,
-                onClick = onNavigateToBooking
-            )
-            BottomNavItem(
-                icon = Icons.Filled.Person,
-                label = "Profile",
-                isSelected = true,
-                onClick = { }
-            )
-        }
-    }
-}
+fun base64ToImageBitmap(base64String: String?): ImageBitmap? {
+    val decodedBytes = toDataUri(base64String) ?: return null
 
-@Composable
-fun BottomNavItem(
-    icon: ImageVector,
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .padding(8.dp)
-            .clickable { onClick() }
-    ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(
-                    if (isSelected) Color(0xFF6200EE).copy(alpha = 0.1f)
-                    else Color.Transparent
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = if (isSelected) Color(0xFF6200EE) else Color.Gray,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            color = if (isSelected) Color(0xFF6200EE) else Color.Gray,
-            modifier = Modifier.padding(top = 4.dp)
-        )
+    return try {
+        BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size).asImageBitmap()
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
     }
 }
