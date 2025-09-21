@@ -338,9 +338,7 @@ class NotificationsViewModel(
 
     // TODO: Replace with actual user ID retrieval
     private fun getCurrentUserId(): String {
-        // Implement your user authentication logic here
-        // This should return the current user's ID
-        return "current_user_id" // Replace with actual user ID retrieval
+        return "current_user_id"
     }
 
     /**

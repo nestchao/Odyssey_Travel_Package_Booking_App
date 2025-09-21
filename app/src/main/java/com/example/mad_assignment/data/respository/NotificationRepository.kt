@@ -18,7 +18,8 @@ class NotificationRepository @Inject constructor(
     private val scheduledDataSource: ScheduledNotificationDataSource,
     private val context: Context
 ) {
-    private var currentUserId: String = "1" // TODO: GET CURRENT USER ID
+    // TODO: GET CURRENT USER ID
+    private var currentUserId: String = "current_user_id"
 
     /**
      * Set the current user ID (call this after authentication)

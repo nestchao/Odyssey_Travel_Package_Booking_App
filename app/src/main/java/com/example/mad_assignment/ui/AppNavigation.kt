@@ -30,6 +30,7 @@ import com.example.mad_assignment.ui.notifications.NotificationSchedulerScreen
 import com.example.mad_assignment.ui.notifications.NotificationsScreen
 import com.example.mad_assignment.ui.packagedetail.PackageDetailScreen
 import com.example.mad_assignment.ui.search.SearchScreen
+import com.example.mad_assignment.ui.wishlist.WishlistScreen
 
 @Composable
 fun AppNavigation(){
@@ -37,7 +38,7 @@ fun AppNavigation(){
     val configuration = LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
 
-    val startDestination = if (isTablet) "tablet_main" else "phone_main"
+    val startDestination = if (isTablet) "tablet_main" else "phone_main" // phone_main
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable("phone_main") {
@@ -84,6 +85,9 @@ fun AppNavigation(){
         }
         composable("notificationScheduler") {
             NotificationSchedulerScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable("wishlist") {
+            WishlistScreen(onNavigateBack = { navController.popBackStack() })
         }
     }
 }

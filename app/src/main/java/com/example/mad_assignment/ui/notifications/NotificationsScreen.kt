@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -253,20 +255,24 @@ fun OptionDropdownMenu(
             modifier = Modifier
                 .fillMaxWidth()
         ) {
-            Text(
-                text = "Mark All as Read",
-                color = Color.Blue,
-                fontSize = 15.sp,
-                textDecoration = TextDecoration.Underline,
+            TextButton(
+                onClick = { viewModel.markAllAsRead() },
+                shape = MaterialTheme.shapes.medium,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.surface,   // button background
+                    contentColor = Color.Blue    // text & icon color
+                ),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(bottom = 10.dp, end = 5.dp)
-                    .clickable {
-                        viewModel.markAllAsRead()
-                    }
-            )
+            ) {
+                Text(
+                    text = "Mark All as Read",
+                    fontSize = 15.sp
+                )
+            }
         }
-
     }
 }
 

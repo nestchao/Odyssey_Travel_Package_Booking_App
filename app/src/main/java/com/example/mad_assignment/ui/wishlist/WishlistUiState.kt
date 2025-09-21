@@ -1,10 +1,9 @@
 package com.example.mad_assignment.ui.wishlist
 
-sealed interface WishlistUiState {
-    /*
-     Wishlist:
-     1. package id
-     2. date time
-     */
+import com.example.mad_assignment.data.model.WishlistItem
 
+sealed interface WishlistUiState {
+    object Loading : WishlistUiState
+    data class Error(val message: String) : WishlistUiState
+    data class Success(val wishlistItems: List<WishlistItem>) : WishlistUiState
 }

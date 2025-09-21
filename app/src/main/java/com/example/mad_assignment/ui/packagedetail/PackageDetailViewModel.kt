@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mad_assignment.data.model.DepartureAndEndTime
 import com.example.mad_assignment.data.repository.TravelPackageRepository
+import com.example.mad_assignment.data.respository.RecentlyViewedRepository
+import com.example.mad_assignment.data.respository.WishlistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -20,6 +22,8 @@ import javax.inject.Inject
 class PackageDetailViewModel @Inject constructor(
     private val packageRepository: TravelPackageRepository,
     // TODO: import cart repository here
+    private val wishlistRepository: WishlistRepository,
+    private val recentlyViewedRepository: RecentlyViewedRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -32,6 +36,8 @@ class PackageDetailViewModel @Inject constructor(
         Log.d("PackageDetailVM", "Initializing with packageId: $packageId")
         if (packageId != null) {
             loadPackageAndRelatedData()
+            trackRecentlyViewed()
+            checkWishlistStatus()
         } else {
             Log.e("PackageDetailVM", "Package ID is null")
             _uiState.value = PackageDetailUiState.Error("Package ID not provided")
@@ -138,4 +144,66 @@ class PackageDetailViewModel @Inject constructor(
         )
         // Add to cart repository
      }
-     */}
+     */
+
+    private val _isInWishlist = MutableStateFlow(false)
+    val isInWishlist: StateFlow<Boolean> = _isInWishlist.asStateFlow()
+
+    // TODO: replace with actual user ID
+    private fun trackRecentlyViewed() {
+        viewModelScope.launch {
+            try {
+                packageId?.let {
+                    recentlyViewedRepository.addToRecentlyViewed("current_user_id", it)
+                    Log.d("PackageDetailVM", "Added to recently viewed: $it")
+                }
+            } catch (e: Exception) {
+                Log.e("PackageDetailVM", "Error adding to recently viewed", e)
+            }
+        }
+    }
+
+    // TODO: replace with actual user ID
+    private fun checkWishlistStatus() {
+        viewModelScope.launch {
+            try {
+                packageId?.let {
+                    val inWishlist = wishlistRepository.isInWishlist("current_user_id", it)
+                    _isInWishlist.value = inWishlist
+                    Log.d("PackageDetailVM", "Wishlist status for $it: $inWishlist")
+                }
+            } catch (e: Exception) {
+                Log.e("PackageDetailVM", "Error checking wishlist status", e)
+            }
+        }
+    }
+
+    // TODO: replace current user id
+    fun toggleFavButton() {
+        viewModelScope.launch {
+            try {
+                packageId?.let {
+                    val userId = "current_user_id"
+                    val isCurrentlyInWishlist = _isInWishlist.value
+
+                    if (isCurrentlyInWishlist) {
+                        // Remove from wishlist using package ID
+                        val wishlistItemId = wishlistRepository.getWishlistItemId(userId, it)
+                        wishlistItemId?.let { itemId ->
+                            wishlistRepository.removeFromWishlist(userId, itemId)
+                            Log.d("PackageDetailVM", "Removed from wishlist: $it")
+                            _isInWishlist.value = false
+                        }
+                    } else {
+                        // Add to wishlist
+                        wishlistRepository.addToWishlist(userId, it)
+                        Log.d("PackageDetailVM", "Added to wishlist: $it")
+                        _isInWishlist.value = true
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("PackageDetailVM", "Error toggling wishlist", e)
+            }
+        }
+    }
+}
