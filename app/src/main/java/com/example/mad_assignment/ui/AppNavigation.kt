@@ -29,6 +29,7 @@ import com.example.mad_assignment.ui.notifications.NotificationDetailsScreen
 import com.example.mad_assignment.ui.notifications.NotificationSchedulerScreen
 import com.example.mad_assignment.ui.notifications.NotificationsScreen
 import com.example.mad_assignment.ui.packagedetail.PackageDetailScreen
+import com.example.mad_assignment.ui.recentlyviewed.RecentlyViewedScreen
 import com.example.mad_assignment.ui.search.SearchScreen
 import com.example.mad_assignment.ui.wishlist.WishlistScreen
 
@@ -88,6 +89,12 @@ fun AppNavigation(){
         }
         composable("wishlist") {
             WishlistScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable("recentlyViewed") {
+            RecentlyViewedScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onPackageClick = { packageId -> navController.navigate("detail/$packageId") }
+            )
         }
     }
 }

@@ -49,4 +49,29 @@ class RecentlyViewedRepository @Inject constructor(
             .await()
         return snapshot.toObjects(RecentlyViewedItem::class.java)
     }
+
+    suspend fun clearRecentlyViewed(userId: String) {
+        val snapshot = getRecentlyViewedCollection(userId).get().await()
+
+        // Delete all documents in batches to avoid hitting Firestore limits
+        val batch = firestore.batch()
+        snapshot.documents.forEach { document ->
+            batch.delete(document.reference)
+        }
+        batch.commit().await()
+    }
+
+    suspend fun removeFromRecentlyViewed(userId: String, packageId: String) {
+        val query = getRecentlyViewedCollection(userId)
+            .whereEqualTo("packageId", packageId)
+            .get()
+            .await()
+
+        query.documents.forEach { it.reference.delete().await() }
+    }
+
+    suspend fun getRecentlyViewedCount(userId: String): Int {
+        val snapshot = getRecentlyViewedCollection(userId).get().await()
+        return snapshot.size()
+    }
 }
