@@ -1,5 +1,9 @@
 package com.example.mad_assignment.ui
 
+
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.livedata.observeAsState
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -17,20 +21,33 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
+import com.example.mad_assignment.ui.aboutus.AboutUsScreen
+import com.example.mad_assignment.ui.aboutus.AboutUsViewModel
+import com.example.mad_assignment.ui.accountdetail.AccountDetailsScreen
+import com.example.mad_assignment.ui.accountdetail.AccountDetailsViewModel
+import com.example.mad_assignment.ui.changepassword.ChangePasswordScreen
+import com.example.mad_assignment.ui.changepassword.ChangePasswordViewModel
 import com.example.mad_assignment.ui.explore.ExploreScreen
+import com.example.mad_assignment.ui.forgetpassword.ForgotPasswordScreen
+import com.example.mad_assignment.ui.forgetpassword.ForgotPasswordViewModel
 import com.example.mad_assignment.ui.home.EnhancedBottomNavigationBar
 import com.example.mad_assignment.ui.home.HomeScreen
 import com.example.mad_assignment.ui.packagedetail.PackageDetailScreen
+import com.example.mad_assignment.ui.profile.ProfileScreen
+import com.example.mad_assignment.ui.profile.ProfileViewModel
 import com.example.mad_assignment.ui.search.SearchScreen
-import com.example.mad_assignment.ui.management.ManagementScreen
-import com.example.mad_assignment.ui.managetravelpackage.manageTravelPackageScreen
-import com.example.mad_assignment.ui.managetrip.ManageTripScreen
+import com.example.mad_assignment.ui.settings.SettingsScreen
+import com.example.mad_assignment.ui.settings.SettingsViewModel
+import com.example.mad_assignment.ui.signin.SignInScreen
+import com.example.mad_assignment.ui.signin.SignInViewModel
+import com.example.mad_assignment.ui.signup.SignUpScreen
+import com.example.mad_assignment.ui.signup.SignUpViewModel
 
 @Composable
 fun AppNavigation(){
@@ -38,21 +55,96 @@ fun AppNavigation(){
     val configuration = LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
 
-    val startDestination = if (isTablet) "tablet_main" else "phone_main"
+    val mainDestination = if (isTablet) "tablet_main" else "phone_main"
 
-    NavHost(navController = navController, startDestination = startDestination) {
-        composable("phone_main") {
+    NavHost(navController = navController, startDestination = "signin") {
+
+        composable("signin") {
+            val viewModel: SignInViewModel = hiltViewModel()
+            SignInScreen(
+                viewModel = viewModel,
+                onSignInSuccess = { user ->
+                    navController.navigate(mainDestination) {
+                        popUpTo("signin") { inclusive = true }
+                    }
+                },
+                onNavigateToSignUp = {
+                    navController.navigate("signup")
+                },
+                onForgotPassword = {
+                    navController.navigate("forgot_password")
+                }
+            )
+        }
+
+        // Sign Up
+        composable("signup") {
+            val viewModel: SignUpViewModel = hiltViewModel()
+            SignUpScreen(
+                viewModel = viewModel,
+                onSignUpSuccess = { user ->
+                    navController.navigate(mainDestination) {
+                        popUpTo("signin") { inclusive = true }
+                    }
+                },
+                onNavigateToSignIn = {
+                    navController.navigate("signin")
+                }
+            )
+        }
+
+        // Forgot Password
+        composable("forgot_password") {
+            val viewModel: ForgotPasswordViewModel = hiltViewModel()
+            ForgotPasswordScreen(
+                viewModel = viewModel,
+                onNavigateBack = {
+                    navController.navigate("signin")
+                },
+                onResetSuccess = {
+                    navController.navigate("signin")
+                }
+            )
+        }
+
+        // --- MODIFIED: Main App Content for Phones ---
+        composable("phone_main") { navBackStackEntry -> // Get the NavBackStackEntry
+
+            // STEP 1: Read the result from the correct SavedStateHandle (this screen's).
+            val shouldRefresh by navBackStackEntry
+                .savedStateHandle
+                .getLiveData<Boolean>("profile_updated")
+                .observeAsState(false) // Default to false
+
             PhoneContainerScreen(
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
                 onNavigateToSearch = { navController.navigate("search") },
-                onNavigateToManagement = { navController.navigate("manage") }
+                onSignOut = { navController.navigate("signin") { popUpTo(navController.graph.startDestinationId) { inclusive = true } } },
+                onNavigateToAccountDetails = { navController.navigate("account_detail") },
+                onNavigateToSettings = { navController.navigate("setting") },
+                shouldRefreshProfile = shouldRefresh,
+                onProfileRefreshDone = {
+                    navBackStackEntry.savedStateHandle["profile_updated"] = false
+                }
             )
         }
-        composable("tablet_main") {
+
+        composable("tablet_main") { navBackStackEntry ->
+            val shouldRefresh by navBackStackEntry
+                .savedStateHandle
+                .getLiveData<Boolean>("profile_updated")
+                .observeAsState(false)
+
             TabletContainerScreen(
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
                 onNavigateToSearch = { navController.navigate("search") },
-                onNavigateToManagement = { navController.navigate("manage") }
+                onSignOut = { navController.navigate("signin") { popUpTo(navController.graph.startDestinationId) { inclusive = true } } },
+                onNavigateToAccountDetails = { navController.navigate("account_detail") },
+                shouldRefreshProfile = shouldRefresh,
+                onNavigateToSettings = { navController.navigate("setting") },
+                onProfileRefreshDone = {
+                    navBackStackEntry.savedStateHandle["profile_updated"] = false
+                }
             )
         }
 
@@ -70,40 +162,44 @@ fun AppNavigation(){
             )
         }
 
-        composable(
-            route = "add_edit_package?packageId={packageId}",
-            arguments = listOf(
-                navArgument("packageId") {
-                    type = NavType.StringType
-                    nullable = true
-                }
+        composable("account_detail") {
+            val viewModel: AccountDetailsViewModel = hiltViewModel()
+            AccountDetailsScreen(
+                viewModel = viewModel,
+                onNavigateBack = { updated ->
+                    if (updated) {
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle
+                            ?.set("profile_updated", true)
+                    }
+                    navController.popBackStack()
+                },
             )
-        ) {
-            manageTravelPackageScreen(navController = navController)
         }
 
-        // --- MODIFIED: Define the route for adding/editing a trip ---
-        composable(
-            route = "add_edit_trip?tripId={tripId}", // The route now accepts an optional tripId
-            arguments = listOf(
-                navArgument("tripId") {
-                    type = NavType.StringType
-                    nullable = true // Nullable, so we can use the same route for adding new trips
-                }
-            )
-        ) {
-            ManageTripScreen(navController = navController)
-        }
-
-        composable("manage") {
-            ManagementScreen(
+        composable("setting"){
+            val viewModel: SettingsViewModel = hiltViewModel()
+            SettingsScreen(
+                viewModel = viewModel,
+                onNavigateToChangePassword = { navController.navigate("changePassword") },
+                onNavigateToAboutUs = { navController.navigate("aboutus") },
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToAddPackage = { navController.navigate("add_edit_package") },
-                onNavigateToEditPackage = { packageId -> navController.navigate("add_edit_package?packageId=$packageId") },
+            )
+        }
 
-                // --- MODIFIED: Connect the navigation callbacks for trips ---
-                onNavigateToAddTrip = { navController.navigate("add_edit_trip") },
-                onNavigateToEditTrip = { tripId -> navController.navigate("add_edit_trip?tripId=$tripId") }
+        composable("changePassword"){
+            val viewModel: ChangePasswordViewModel = hiltViewModel()
+            ChangePasswordScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        composable("aboutus"){
+            val viewModel: AboutUsViewModel = hiltViewModel()
+            AboutUsScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() },
             )
         }
     }
@@ -113,7 +209,11 @@ fun AppNavigation(){
 private fun PhoneContainerScreen(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
-    onNavigateToManagement: () -> Unit
+    onSignOut: () -> Unit,
+    onNavigateToAccountDetails : () -> Unit,
+    onNavigateToSettings : () -> Unit,
+    shouldRefreshProfile: Boolean,
+    onProfileRefreshDone: () -> Unit
 ) {
     val contentNavController = rememberNavController()
     Scaffold(
@@ -124,29 +224,55 @@ private fun PhoneContainerScreen(
             startDestination = "home",
             modifier = Modifier.padding(innerPadding)
         ) {
-            sharedAppGraph(
-                onNavigateToDetail = onNavigateToDetail,
-                onNavigateToSearch = onNavigateToSearch,
-                onNavigateToManagement = onNavigateToManagement
-            )
+            composable("home") {
+                HomeScreen(
+                    onPackageClick = onNavigateToDetail,
+                    onNavigateToSearch = onNavigateToSearch
+                )
+            }
+            composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
+            composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
+            composable("profile") {
+                val viewModel: ProfileViewModel = hiltViewModel()
+
+
+                if (shouldRefreshProfile) {
+                    LaunchedEffect(Unit) {
+                        viewModel.loadProfile(forceServer = true)
+                        onProfileRefreshDone()
+                    }
+                }
+
+                ProfileScreen(
+                    viewModel = viewModel,
+                    onNavigateToAccountDetails = onNavigateToAccountDetails,
+                    onNavigateToSettings = onNavigateToSettings,
+                    onSignOut = onSignOut
+                )
+            }
         }
     }
 }
 
+// --- MODIFIED: Container for the Tablet Layout ---
 @Composable
 private fun TabletContainerScreen(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
-    onNavigateToManagement: () -> Unit
+    onSignOut: () -> Unit,
+    onNavigateToAccountDetails : () -> Unit,
+    onNavigateToSettings : () -> Unit,
+    shouldRefreshProfile: Boolean,
+    onProfileRefreshDone: () -> Unit
 ) {
     val contentNavController = rememberNavController()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
     if (isLandscape) {
-        Row(modifier = Modifier.fillMaxSize()) {
+        Row {
             TabletSideNavigation(
-                modifier = Modifier.width(280.dp).fillMaxHeight(),
+                modifier = Modifier.width(240.dp).fillMaxHeight(),
                 navController = contentNavController
             )
             NavHost(
@@ -154,33 +280,51 @@ private fun TabletContainerScreen(
                 startDestination = "home",
                 modifier = Modifier.weight(1f)
             ) {
-                sharedAppGraph(
-                    onNavigateToDetail = onNavigateToDetail,
-                    onNavigateToSearch = onNavigateToSearch,
-                    onNavigateToManagement = onNavigateToManagement
-                )
+                composable("home") {
+                    HomeScreen(
+                        onPackageClick = onNavigateToDetail,
+                        onNavigateToSearch = onNavigateToSearch
+                    )
+                }
+                composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
+                composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
                 composable("favorites") { PlaceholderScreen(screenName = "Favorites") }
                 composable("settings") { PlaceholderScreen(screenName = "Settings") }
+
+                // --- MODIFIED: Integrated Profile Screen (Tablet) ---
+                composable("profile") {
+                    val viewModel: ProfileViewModel = hiltViewModel()
+
+                    if (shouldRefreshProfile) {
+                        LaunchedEffect(Unit) {
+                            viewModel.loadProfile(forceServer = true)
+                            onProfileRefreshDone()
+                        }
+                    }
+
+                    ProfileScreen(
+                        viewModel = viewModel,
+                        onSignOut = onSignOut,
+                        onNavigateToAccountDetails = onNavigateToAccountDetails,
+                        onNavigateToSettings = onNavigateToSettings
+                    )
+                }
             }
         }
     } else {
-        Scaffold(
-            bottomBar = { EnhancedBottomNavigationBar(navController = contentNavController) }
-        ) { innerPadding ->
-            NavHost(
-                navController = contentNavController,
-                startDestination = "home",
-                modifier = Modifier.padding(innerPadding)
-            ) {
-                sharedAppGraph(
-                    onNavigateToDetail = onNavigateToDetail,
-                    onNavigateToSearch = onNavigateToSearch,
-                    onNavigateToManagement = onNavigateToManagement
-                )
-            }
-        }
+        // Portrait tablet uses the same layout as the phone, passing the new parameters through
+        PhoneContainerScreen(
+            onNavigateToDetail = onNavigateToDetail,
+            onNavigateToSearch = onNavigateToSearch,
+            onSignOut = onSignOut,
+            onNavigateToAccountDetails = onNavigateToAccountDetails,
+            onNavigateToSettings = onNavigateToSettings,
+            shouldRefreshProfile = shouldRefreshProfile,
+            onProfileRefreshDone = onProfileRefreshDone
+        )
     }
 }
+
 
 private data class SideNavItem(
     val label: String,
@@ -189,6 +333,7 @@ private data class SideNavItem(
     val filledIcon: ImageVector
 )
 
+// --- Navigation Rail for Tablet ---
 @Composable
 private fun TabletSideNavigation(
     modifier: Modifier = Modifier,
@@ -217,7 +362,9 @@ private fun TabletSideNavigation(
                 .padding(16.dp)
         ) {
             Card(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                 ),
@@ -269,7 +416,9 @@ private fun TabletSideNavigation(
                             Color.Transparent
                     ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
@@ -343,6 +492,7 @@ private fun TabletSideNavigation(
     }
 }
 
+// --- Placeholder Screen ---
 @Composable
 fun PlaceholderScreen(screenName: String) {
     Box(
@@ -351,21 +501,4 @@ fun PlaceholderScreen(screenName: String) {
     ) {
         Text(text = "$screenName Screen", style = MaterialTheme.typography.headlineMedium)
     }
-}
-
-private fun NavGraphBuilder.sharedAppGraph(
-    onNavigateToDetail: (String) -> Unit,
-    onNavigateToSearch: () -> Unit,
-    onNavigateToManagement: () -> Unit
-) {
-    composable("home") {
-        HomeScreen(
-            onPackageClick = onNavigateToDetail,
-            onNavigateToSearch = onNavigateToSearch,
-            onNavigateToManagement = onNavigateToManagement
-        )
-    }
-    composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
-    composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
-    composable("profile") { PlaceholderScreen(screenName = "Profile") }
 }
