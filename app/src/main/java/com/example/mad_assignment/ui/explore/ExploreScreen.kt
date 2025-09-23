@@ -26,7 +26,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.mad_assignment.ui.home.EnhancedErrorState
 import com.example.mad_assignment.ui.home.EnhancedLoadingState
 import com.example.mad_assignment.ui.home.TabletPackageGridCard
-import com.example.mad_assignment.ui.home.TravelPackageWithImages
 
 @Composable
 fun ExploreScreen(
@@ -73,13 +72,6 @@ fun ExploreContent(
             )
         }
         item {
-            CategoryFilters(
-                categories = viewModel.categories,
-                selectedCategories = state.filterState.selectedCategories,
-                onCategorySelected = viewModel::onCategorySelected
-            )
-        }
-        item {
             ResultsHeader(
                 resultsCount = state.displayedPackages.size,
                 selectedSortOption = state.filterState.selectedSortOption,
@@ -98,14 +90,13 @@ fun ExploreContent(
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 160.dp),
                     modifier = Modifier
-                        .heightIn(max = 2000.dp) // Adjust height as needed
+                        .heightIn(max = 2000.dp)
                         .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
-                    userScrollEnabled = false // LazyColumn handles scrolling
+                    userScrollEnabled = false
                 ) {
                     items(state.displayedPackages, key = { it.travelPackage.packageId }) { packageData ->
-                        // Reusing the card from HomeScreen for consistency
                         TabletPackageGridCard(
                             packageData = packageData,
                             onClick = { onPackageClick(packageData.travelPackage.packageId) }
@@ -161,47 +152,6 @@ fun SearchBar(
         singleLine = true,
         maxLines = 1,
     )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun CategoryFilters(
-    categories: List<String>,
-    selectedCategories: Set<String>,
-    onCategorySelected: (String) -> Unit
-) {
-    Column(modifier = Modifier.padding(vertical = 8.dp)) {
-        Text(
-            "Categories",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(categories) { category ->
-                val isSelected = selectedCategories.contains(category)
-                FilterChip(
-                    selected = isSelected,
-                    onClick = { onCategorySelected(category) },
-                    label = { Text(category) },
-                    leadingIcon = if (isSelected) {
-                        {
-                            Icon(
-                                Icons.Default.FilterList,
-                                contentDescription = null,
-                                modifier = Modifier.size(FilterChipDefaults.IconSize)
-                            )
-                        }
-                    } else {
-                        null
-                    }
-                )
-            }
-        }
-    }
 }
 
 @Composable

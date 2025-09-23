@@ -1,13 +1,15 @@
 package com.example.mad_assignment.ui.packagedetail
 
 import com.example.mad_assignment.data.model.DepartureAndEndTime
+import com.example.mad_assignment.data.model.TravelPackage
 import com.example.mad_assignment.data.model.Trip
+import com.example.mad_assignment.data.model.TravelPackageWithImages
 
 sealed interface PackageDetailUiState {
     object Loading : PackageDetailUiState
     data class Error(val message: String) : PackageDetailUiState
     data class Success(
-        val packageDetail: PackageDetailData,
+        val packageDetail: TravelPackageWithImages,
         val itineraryTrips: Map<Int, List<Trip>> = emptyMap(),
         val departures: List<DepartureAndEndTime> = emptyList(),
         val selectedDeparture: DepartureAndEndTime? = null,
