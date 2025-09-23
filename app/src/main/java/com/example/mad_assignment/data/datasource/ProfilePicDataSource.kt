@@ -1,11 +1,7 @@
 package com.example.mad_assignment.data.datasource
 
 import com.example.mad_assignment.data.model.ProfilePic
-import com.example.mad_assignment.data.model.User
-import com.example.mad_assignment.data.model.UserType
-import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.toObjects
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton

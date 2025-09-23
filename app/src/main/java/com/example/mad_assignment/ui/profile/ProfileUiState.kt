@@ -12,11 +12,14 @@ sealed interface ProfileUiState {
         val user: User,
         val ProfilePic: ProfilePic
     ) : ProfileUiState {
-        val displayName: String get() = user.userName.ifEmpty { user.userEmail }
-        val shortDisplayName: String get() = displayName.take(15)
-        val isNameTruncated: Boolean get() = displayName.length > 15
+        val displayName: String
+            get() {
+                val fullName = "${user.firstName} ${user.lastName}".trim()
+                return fullName.ifEmpty { user.userEmail }
+            }
+        val shortDisplayName: String get() = displayName.take(12)
+        val isNameTruncated: Boolean get() = displayName.length > 12
         val totalTrips: Int get() = 0
-        val totalReviews: Int get() = 0
         val yearsOnOdyssey: Int get() = 0
 
     }

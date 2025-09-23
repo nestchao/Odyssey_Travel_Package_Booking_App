@@ -131,9 +131,14 @@ class SignInViewModel @Inject constructor(
 
             // If user is null, they exist in Auth but not in our database. Create them.
             if (user == null) {
+                val nameParts = name?.trim()?.split(" ", limit = 2) ?: listOf()
+                val firstName = nameParts.getOrNull(0) ?: ""
+                val lastName = nameParts.getOrNull(1) ?: ""
+
                 val newUser = User(
                     userID = userId,
-                    userName = name ?: "No Name",
+                    firstName = firstName,
+                    lastName = lastName,
                     userEmail = email ?: "no-email@example.com",
                     userType = UserType.CUSTOMER
                 )

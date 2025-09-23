@@ -28,23 +28,21 @@ class ProfileViewModel @Inject constructor(
         loadProfile()
     }
 
-    fun loadProfile() {
+    fun loadProfile(forceServer: Boolean = false) {
         viewModelScope.launch {
             _uiState.value = ProfileUiState.Loading()
             try {
-                // Get the user ID first
                 val userId = auth.currentUser?.uid
                     ?: throw IllegalStateException("User is not authenticated.")
 
-                // Fetch the user, and throw an error if it's not found
-                val user = userRepository.getUserById(userId)
+                // This now passes the 'forceServer' parameter to the repository
+                val user = userRepository.getUserById(userId, forceServer = forceServer)
                     ?: throw IllegalStateException("User profile not found in database.")
 
-                // Fetch the profile picture, and throw an error if it's not found
-                val profilePic = profilePictureRepository.getProfilePicture(userId)
+                // Do the same for your profile picture repository
+                val profilePic = profilePictureRepository.getProfilePicture(userId, forceServer = forceServer)
                     ?: throw IllegalStateException("Profile picture not found in database.")
 
-                // Only create the Success state if BOTH were found successfully
                 _uiState.value = ProfileUiState.Success(user, profilePic)
 
             } catch (e: Exception) {
@@ -85,34 +83,6 @@ class ProfileViewModel @Inject constructor(
     fun signOut() {
         auth.signOut()
         _uiState.value = ProfileUiState.Loading()
-    }
-
-    fun updateProfile(updates: Map<String, Any>) {
-        val userId = auth.currentUser?.uid ?: return // Early exit if not logged in
-
-        val originalState = _uiState.value as? ProfileUiState.Success
-
-        viewModelScope.launch {
-            try {
-                val success = userRepository.updateUser(userId, updates)
-                if (success) {
-                    // The best practice is to reload everything from the source of truth.
-                    loadProfile()
-                } else {
-                    _uiState.value = ProfileUiState.Error(
-                        message = "Failed to update profile.",
-                        user = originalState?.user,
-                        ProfilePic = originalState?.ProfilePic
-                    )
-                }
-            } catch (e: Exception) {
-                _uiState.value = ProfileUiState.Error(
-                    message = "Failed to update profile: ${e.message ?: "Unknown error"}",
-                    user = originalState?.user,
-                    ProfilePic = originalState?.ProfilePic
-                )
-            }
-        }
     }
 
     fun clearError() {

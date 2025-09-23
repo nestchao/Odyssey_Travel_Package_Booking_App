@@ -4,14 +4,16 @@ import com.example.mad_assignment.data.model.User
 
 sealed interface SignUpUiState {
     data class Idle(
-        val name: String = "",
+        val firstName: String = "",
+        val lastName: String = "",
         val email: String = "",
         val phoneNumber: String = "",
         val password: String = "",
         val confirmPassword: String = "",
         val isPasswordVisible: Boolean = false,
         val isConfirmPasswordVisible: Boolean = false,
-        val nameError: String? = null,
+        val firstNameError: String? = null,
+        val lastNameError: String? = null,
         val emailError: String? = null,
         val phoneNumberError: String? = null,
         val passwordError: String? = null,
@@ -19,21 +21,24 @@ sealed interface SignUpUiState {
     ) : SignUpUiState
 
     data class Loading(
-        val name: String = "",
+        val firstName: String = "",
+        val lastName: String = "",
         val email: String = "",
         val phoneNumber: String = ""
     ) : SignUpUiState
 
     data class Error(
         val message: String,
-        val name: String = "",
+        val firstName: String = "",
+        val lastName: String = "",
         val email: String = "",
         val phoneNumber: String = "",
         val password: String = "",
         val confirmPassword: String = "",
         val isPasswordVisible: Boolean = false,
         val isConfirmPasswordVisible: Boolean = false,
-        val nameError: String? = null,
+        val firstNameError: String? = null,
+        val lastNameError: String? = null,
         val emailError: String? = null,
         val phoneNumberError: String? = null,
         val passwordError: String? = null,

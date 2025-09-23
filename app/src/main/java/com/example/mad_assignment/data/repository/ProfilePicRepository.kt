@@ -8,9 +8,11 @@ class ProfilePicRepository @Inject constructor(
     private val dataSource: ProfilePicDataSource
 ) {
 
-    suspend fun getProfilePicture(userId: String): ProfilePic? {
+    suspend fun getProfilePicture(userId: String,forceServer: Boolean = false): ProfilePic? {
         val result = dataSource.getProfilePicture(userId)
         return result.getOrNull()
+
+
     }
 
     suspend fun setProfilePicture(userId: String, base64Data: String): Boolean {

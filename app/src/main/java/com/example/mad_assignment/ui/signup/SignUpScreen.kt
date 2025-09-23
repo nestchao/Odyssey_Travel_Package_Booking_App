@@ -202,18 +202,36 @@ private fun SignUpContent(
                 // Name Field
                 ModernTextField(
                     value = when (uiState) {
-                        is SignUpUiState.Idle -> uiState.name
-                        is SignUpUiState.Error -> uiState.name
+                        is SignUpUiState.Idle -> uiState.firstName
+                        is SignUpUiState.Error -> uiState.firstName
                         else -> ""
                     },
-                    onValueChange = { viewModel.onNameChange(it) },
-                    label = "Full Name",
+                    onValueChange = { viewModel.onFirstNameChange(it) },
+                    label = "First Name",
                     icon = Icons.Default.Person,
                     keyboardType = KeyboardType.Text,
                     imeAction = ImeAction.Next,
                     onImeAction = { focusManager.moveFocus(FocusDirection.Down) },
-                    isError = (uiState as? SignUpUiState.Error)?.nameError != null,
-                    errorMessage = (uiState as? SignUpUiState.Error)?.nameError
+                    isError = (uiState as? SignUpUiState.Error)?.firstNameError != null,
+                    errorMessage = (uiState as? SignUpUiState.Error)?.firstNameError
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                ModernTextField(
+                    value = when (uiState) {
+                        is SignUpUiState.Idle -> uiState.lastName
+                        is SignUpUiState.Error -> uiState.lastName
+                        else -> ""
+                    },
+                    onValueChange = { viewModel.onLastNameChange(it) },
+                    label = "Last Name",
+                    icon = Icons.Default.Person,
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Next,
+                    onImeAction = { focusManager.moveFocus(FocusDirection.Down) },
+                    isError = (uiState as? SignUpUiState.Error)?.lastNameError != null,
+                    errorMessage = (uiState as? SignUpUiState.Error)?.lastNameError
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))

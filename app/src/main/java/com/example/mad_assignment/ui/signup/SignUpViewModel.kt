@@ -29,13 +29,21 @@ class SignUpViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<SignUpUiState>(SignUpUiState.Idle())
     val uiState: StateFlow<SignUpUiState> = _uiState.asStateFlow()
 
-
-
-    fun onNameChange(name: String) {
+    fun onFirstNameChange(firstName: String) {
         _uiState.update { currentState ->
             when (currentState) {
-                is SignUpUiState.Idle -> currentState.copy(name = name, nameError = null)
-                is SignUpUiState.Error -> currentState.copy(name = name, nameError = null)
+                is SignUpUiState.Idle -> currentState.copy(firstName = firstName, firstNameError = null)
+                is SignUpUiState.Error -> currentState.copy(firstName = firstName, firstNameError = null)
+                else -> currentState
+            }
+        }
+    }
+
+    fun onLastNameChange(lastName: String) {
+        _uiState.update { currentState ->
+            when (currentState) {
+                is SignUpUiState.Idle -> currentState.copy(lastName = lastName, lastNameError = null)
+                is SignUpUiState.Error -> currentState.copy(lastName = lastName, lastNameError = null)
                 else -> currentState
             }
         }
@@ -105,17 +113,18 @@ class SignUpViewModel @Inject constructor(
         val currentState = _uiState.value
         if (currentState !is SignUpUiState.Idle && currentState !is SignUpUiState.Error) return
 
-        val name = (currentState as? SignUpUiState.Idle)?.name ?: (currentState as? SignUpUiState.Error)?.name ?: ""
+        val firstName = (currentState as? SignUpUiState.Idle)?.firstName ?: (currentState as? SignUpUiState.Error)?.firstName ?: ""
+        val lastName = (currentState as? SignUpUiState.Idle)?.lastName ?: (currentState as? SignUpUiState.Error)?.lastName ?: ""
         val email = (currentState as? SignUpUiState.Idle)?.email ?: (currentState as? SignUpUiState.Error)?.email ?: ""
         val phoneNumber = (currentState as? SignUpUiState.Idle)?.phoneNumber ?: (currentState as? SignUpUiState.Error)?.phoneNumber ?: ""
         val password = (currentState as? SignUpUiState.Idle)?.password ?: (currentState as? SignUpUiState.Error)?.password ?: ""
         val confirmPassword = (currentState as? SignUpUiState.Idle)?.confirmPassword ?: (currentState as? SignUpUiState.Error)?.confirmPassword ?: ""
 
-        if (!validateInputs(name, email, phoneNumber, password, confirmPassword)) {
+        if (!validateInputs(firstName,lastName, email, phoneNumber, password, confirmPassword)) {
             return
         }
 
-        _uiState.value = SignUpUiState.Loading(name, email, phoneNumber)
+        _uiState.value = SignUpUiState.Loading(firstName,lastName, email, phoneNumber)
 
         viewModelScope.launch {
             try {
@@ -123,12 +132,17 @@ class SignUpViewModel @Inject constructor(
                 val authResult = auth.createUserWithEmailAndPassword(email.trim(), password).await()
                 val firebaseUser = authResult.user ?: throw Exception("Firebase user not found after creation.")
 
-                val profileUpdates = UserProfileChangeRequest.Builder().setDisplayName(name).build()
+                // Corrected: Combine firstName and lastName for the display name.
+                val displayName = "$firstName $lastName".trim()
+                val profileUpdates = UserProfileChangeRequest.Builder()
+                    .setDisplayName(displayName)
+                    .build()
                 firebaseUser.updateProfile(profileUpdates).await()
 
                 val newUser = User(
                     userID = firebaseUser.uid,
-                    userName = name,
+                    firstName = firstName,
+                    lastName = lastName,
                     userEmail = email.trim(),
                     userPhoneNumber = phoneNumber,
                     userType = UserType.CUSTOMER
@@ -146,7 +160,8 @@ class SignUpViewModel @Inject constructor(
             } catch (e: Exception) {
                 _uiState.value = SignUpUiState.Error(
                     message = getAuthErrorMessage(e),
-                    name = name,
+                    firstName = firstName,
+                    lastName = lastName,
                     email = email,
                     phoneNumber = phoneNumber,
                     password = password,
@@ -158,8 +173,9 @@ class SignUpViewModel @Inject constructor(
 
     // --- Private Helper Functions ---
 
-    private fun validateInputs(name: String, email: String, phone: String, pass: String, confirmPass: String): Boolean {
-        val nameError = if (name.isBlank()) "Name is required" else null
+    private fun validateInputs(firstName: String,lastName: String, email: String, phone: String, pass: String, confirmPass: String): Boolean {
+        val firstNameError = if (firstName.isBlank()) "First Name is required" else null
+        val lastNameError = if (lastName.isBlank()) "Last Name is required" else null
         val emailError = when {
             email.isBlank() -> "Email is required"
             !Patterns.EMAIL_ADDRESS.matcher(email).matches() -> "Invalid email format"
@@ -177,17 +193,19 @@ class SignUpViewModel @Inject constructor(
             else -> null
         }
 
-        val hasError = listOfNotNull(nameError, emailError, phoneNumberError, passwordError, confirmPasswordError).isNotEmpty()
+        val hasError = listOfNotNull(firstNameError,lastNameError, emailError, phoneNumberError, passwordError, confirmPasswordError).isNotEmpty()
 
         if (hasError) {
             _uiState.value = SignUpUiState.Error(
                 message = "Please fix the errors below",
-                name = name,
+                firstName = firstName,
+                lastName = lastName,
                 email = email,
                 phoneNumber = phone,
                 password = pass,
                 confirmPassword = confirmPass,
-                nameError = nameError,
+                firstNameError = firstNameError,
+                lastNameError = lastNameError,
                 emailError = emailError,
                 phoneNumberError = phoneNumberError,
                 passwordError = passwordError,

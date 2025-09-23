@@ -17,7 +17,7 @@ class UserRepository @Inject constructor(
     }
 
     // ✅ Get user by ID
-    suspend fun getUserById(userId: String): User? {
+    suspend fun getUserById(userId: String, forceServer: Boolean = false): User? {
         val result = userDataSource.getUserById(userId)
         return result.getOrNull()
     }

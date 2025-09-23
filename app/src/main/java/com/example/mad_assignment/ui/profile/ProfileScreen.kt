@@ -3,6 +3,7 @@ package com.example.mad_assignment.ui.profile
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -19,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -153,7 +155,12 @@ private fun ProfileContent(
                             Image(
                                 bitmap = imageBitmap,
                                 contentDescription = "Profile Picture",
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier
+                                    .size(100.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFF5F5F5))
+                                    .border(2.dp, Color.Gray, CircleShape),
+                                contentScale = ContentScale.Crop
                             )
                         } else {
                             Icon(
@@ -192,8 +199,6 @@ private fun ProfileContent(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     ProfileStat(number = uiState.totalTrips.toString(), label = "Trips")
-                    Spacer(modifier = Modifier.height(16.dp))
-                    ProfileStat(number = uiState.totalReviews.toString(), label = "Review")
                     Spacer(modifier = Modifier.height(16.dp))
                     ProfileStat(number = uiState.yearsOnOdyssey.toString(), label = "Years On Odyssey")
                 }

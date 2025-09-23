@@ -34,6 +34,10 @@ sealed interface SignInUiState {
     ) : SignInUiState {
         val isCustomer: Boolean get() = user.userType == UserType.CUSTOMER
         val isAdmin: Boolean get() = user.userType == UserType.ADMIN
-        val displayName: String get() = user.userName.ifEmpty { user.userEmail }
+        val displayName: String
+            get() {
+                val fullName = "${user.firstName} ${user.lastName}".trim()
+                return fullName.ifEmpty { user.userEmail }
+            }
     }
 }
