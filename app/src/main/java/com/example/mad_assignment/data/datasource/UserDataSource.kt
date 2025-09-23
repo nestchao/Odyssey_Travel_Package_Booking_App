@@ -8,6 +8,9 @@ import com.google.firebase.firestore.toObjects
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 
 @Singleton
 class UserDataSource @Inject constructor(
@@ -15,6 +18,31 @@ class UserDataSource @Inject constructor(
 ) {
     companion object {
         private const val USERS_COLLECTION = "users"
+    }
+
+    fun getUserStream(userId: String): Flow<Result<User>> = callbackFlow {
+        val docRef = firestore.collection(USERS_COLLECTION).document(userId)
+
+        // addSnapshotListener is the key. It stays active and runs whenever data changes.
+        val listener = docRef.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                trySend(Result.failure(error)) // Send error to the flow
+                close(error)                   // Close the flow
+                return@addSnapshotListener
+            }
+            if (snapshot != null && snapshot.exists()) {
+                val user = snapshot.toObject(User::class.java)
+                if (user != null) {
+                    trySend(Result.success(user)) // Send successful data to the flow
+                } else {
+                    trySend(Result.failure(Exception("Failed to parse user data")))
+                }
+            } else {
+                trySend(Result.failure(Exception("User document does not exist")))
+            }
+        }
+        // This is crucial: when the flow is cancelled, remove the listener to prevent memory leaks.
+        awaitClose { listener.remove() }
     }
 
     // ✅ Get all users

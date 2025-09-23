@@ -27,10 +27,13 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
+import com.example.mad_assignment.data.model.UserType
 import com.example.mad_assignment.ui.aboutus.AboutUsScreen
 import com.example.mad_assignment.ui.aboutus.AboutUsViewModel
 import com.example.mad_assignment.ui.accountdetail.AccountDetailsScreen
 import com.example.mad_assignment.ui.accountdetail.AccountDetailsViewModel
+import com.example.mad_assignment.ui.admin.AdminDashboardScreen
+import com.example.mad_assignment.ui.admin.AdminDashboardViewModel
 import com.example.mad_assignment.ui.changepassword.ChangePasswordScreen
 import com.example.mad_assignment.ui.changepassword.ChangePasswordViewModel
 import com.example.mad_assignment.ui.explore.ExploreScreen
@@ -64,7 +67,11 @@ fun AppNavigation(){
             SignInScreen(
                 viewModel = viewModel,
                 onSignInSuccess = { user ->
-                    navController.navigate(mainDestination) {
+                    val destination = when (user.userType) {
+                        UserType.ADMIN -> "admin_dashboard"
+                        UserType.CUSTOMER -> mainDestination
+                    }
+                    navController.navigate(destination) {
                         popUpTo("signin") { inclusive = true }
                     }
                 },
@@ -107,44 +114,24 @@ fun AppNavigation(){
             )
         }
 
-        // --- MODIFIED: Main App Content for Phones ---
-        composable("phone_main") { navBackStackEntry -> // Get the NavBackStackEntry
-
-            // STEP 1: Read the result from the correct SavedStateHandle (this screen's).
-            val shouldRefresh by navBackStackEntry
-                .savedStateHandle
-                .getLiveData<Boolean>("profile_updated")
-                .observeAsState(false) // Default to false
-
+        composable("phone_main") {
             PhoneContainerScreen(
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
                 onNavigateToSearch = { navController.navigate("search") },
                 onSignOut = { navController.navigate("signin") { popUpTo(navController.graph.startDestinationId) { inclusive = true } } },
                 onNavigateToAccountDetails = { navController.navigate("account_detail") },
-                onNavigateToSettings = { navController.navigate("setting") },
-                shouldRefreshProfile = shouldRefresh,
-                onProfileRefreshDone = {
-                    navBackStackEntry.savedStateHandle["profile_updated"] = false
-                }
+                onNavigateToSettings = { navController.navigate("setting") }
             )
         }
 
         composable("tablet_main") { navBackStackEntry ->
-            val shouldRefresh by navBackStackEntry
-                .savedStateHandle
-                .getLiveData<Boolean>("profile_updated")
-                .observeAsState(false)
 
             TabletContainerScreen(
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
                 onNavigateToSearch = { navController.navigate("search") },
                 onSignOut = { navController.navigate("signin") { popUpTo(navController.graph.startDestinationId) { inclusive = true } } },
                 onNavigateToAccountDetails = { navController.navigate("account_detail") },
-                shouldRefreshProfile = shouldRefresh,
-                onNavigateToSettings = { navController.navigate("setting") },
-                onProfileRefreshDone = {
-                    navBackStackEntry.savedStateHandle["profile_updated"] = false
-                }
+                onNavigateToSettings = { navController.navigate("setting") }
             )
         }
 
@@ -166,12 +153,7 @@ fun AppNavigation(){
             val viewModel: AccountDetailsViewModel = hiltViewModel()
             AccountDetailsScreen(
                 viewModel = viewModel,
-                onNavigateBack = { updated ->
-                    if (updated) {
-                        navController.previousBackStackEntry
-                            ?.savedStateHandle
-                            ?.set("profile_updated", true)
-                    }
+                onNavigateBack = {
                     navController.popBackStack()
                 },
             )
@@ -202,6 +184,22 @@ fun AppNavigation(){
                 onNavigateBack = { navController.popBackStack() },
             )
         }
+
+        composable("admin_dashboard") {
+            val viewModel: AdminDashboardViewModel = hiltViewModel()
+            AdminDashboardScreen(
+                viewModel = viewModel,
+                onNavigateToUsers = { navController.navigate("admin_users") },
+                onNavigateToBookings = { navController.navigate("admin_bookings") },
+                onNavigateToAnalytics = { navController.navigate("admin_analytics") },
+                onNavigateToSettings = { navController.navigate("admin_settings") },
+                onSignOut = {
+                    navController.navigate("signin") {
+                        popUpTo("admin_dashboard") { inclusive = true }
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -212,8 +210,6 @@ private fun PhoneContainerScreen(
     onSignOut: () -> Unit,
     onNavigateToAccountDetails : () -> Unit,
     onNavigateToSettings : () -> Unit,
-    shouldRefreshProfile: Boolean,
-    onProfileRefreshDone: () -> Unit
 ) {
     val contentNavController = rememberNavController()
     Scaffold(
@@ -233,18 +229,8 @@ private fun PhoneContainerScreen(
             composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
             composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
             composable("profile") {
-                val viewModel: ProfileViewModel = hiltViewModel()
-
-
-                if (shouldRefreshProfile) {
-                    LaunchedEffect(Unit) {
-                        viewModel.loadProfile(forceServer = true)
-                        onProfileRefreshDone()
-                    }
-                }
-
                 ProfileScreen(
-                    viewModel = viewModel,
+                    viewModel = hiltViewModel(),
                     onNavigateToAccountDetails = onNavigateToAccountDetails,
                     onNavigateToSettings = onNavigateToSettings,
                     onSignOut = onSignOut
@@ -262,8 +248,6 @@ private fun TabletContainerScreen(
     onSignOut: () -> Unit,
     onNavigateToAccountDetails : () -> Unit,
     onNavigateToSettings : () -> Unit,
-    shouldRefreshProfile: Boolean,
-    onProfileRefreshDone: () -> Unit
 ) {
     val contentNavController = rememberNavController()
     val configuration = LocalConfiguration.current
@@ -291,22 +275,12 @@ private fun TabletContainerScreen(
                 composable("favorites") { PlaceholderScreen(screenName = "Favorites") }
                 composable("settings") { PlaceholderScreen(screenName = "Settings") }
 
-                // --- MODIFIED: Integrated Profile Screen (Tablet) ---
                 composable("profile") {
-                    val viewModel: ProfileViewModel = hiltViewModel()
-
-                    if (shouldRefreshProfile) {
-                        LaunchedEffect(Unit) {
-                            viewModel.loadProfile(forceServer = true)
-                            onProfileRefreshDone()
-                        }
-                    }
-
                     ProfileScreen(
-                        viewModel = viewModel,
-                        onSignOut = onSignOut,
+                        viewModel = hiltViewModel(),
                         onNavigateToAccountDetails = onNavigateToAccountDetails,
-                        onNavigateToSettings = onNavigateToSettings
+                        onNavigateToSettings = onNavigateToSettings,
+                        onSignOut = onSignOut
                     )
                 }
             }
@@ -319,8 +293,6 @@ private fun TabletContainerScreen(
             onSignOut = onSignOut,
             onNavigateToAccountDetails = onNavigateToAccountDetails,
             onNavigateToSettings = onNavigateToSettings,
-            shouldRefreshProfile = shouldRefreshProfile,
-            onProfileRefreshDone = onProfileRefreshDone
         )
     }
 }

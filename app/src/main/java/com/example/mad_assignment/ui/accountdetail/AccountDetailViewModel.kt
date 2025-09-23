@@ -133,10 +133,8 @@ class AccountDetailsViewModel @Inject constructor(
 
     fun onProfilePictureChanged(uri: Uri) {
         viewModelScope.launch {
-            // First, convert the image URI to a Base64 string.
             val newBase64 = convertUriToBase64(uri)
 
-            // Now, update the UI state with this new Base64 string for the preview.
             _uiState.update { currentState ->
                 if (currentState is AccountDetailsUiState.Success) {
                     currentState.copy(newImagePreview = newBase64)
@@ -153,16 +151,11 @@ class AccountDetailsViewModel @Inject constructor(
 
         if (!currentState.isFormValid) return
 
-        _uiState.update {
-            if (it is AccountDetailsUiState.Success) {
-                it.copy(isSaving = true)
-            } else {
-                it
-            }
-        }
+        _uiState.update { (it as AccountDetailsUiState.Success).copy(isSaving = true) }
 
         viewModelScope.launch {
             try {
+                // User details update logic remains the same...
                 val userId = currentState.user.userID
                 val updates = mapOf(
                     "gender" to currentState.user.gender,
@@ -171,12 +164,9 @@ class AccountDetailsViewModel @Inject constructor(
                     "userEmail" to currentState.user.userEmail,
                     "userPhoneNumber" to currentState.user.userPhoneNumber
                 )
-                val detailsSuccess = userRepository.updateUser(userId, updates)
-                if (!detailsSuccess) {
-                    throw Exception("Failed to update user details.")
-                }
+                userRepository.updateUser(userId, updates)
 
-                val pictureToSave = newProfilePicBase64
+                val pictureToSave = currentState.newImagePreview
                 if (pictureToSave != null) {
                     val pictureSuccess = profilePictureRepository.setProfilePicture(userId, pictureToSave)
                     if (!pictureSuccess) {
@@ -193,6 +183,8 @@ class AccountDetailsViewModel @Inject constructor(
             }
         }
     }
+
+
 
     fun onSaveHandled() {
         _saveSuccess.value = false

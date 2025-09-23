@@ -71,7 +71,7 @@ fun ProfileScreen(
                 } else {
                     ErrorScreen(
                         error = state.message,
-                        onRetry = { viewModel.loadProfile() }
+                        onRetry = { viewModel.retry() }
                     )
                 }
             }
