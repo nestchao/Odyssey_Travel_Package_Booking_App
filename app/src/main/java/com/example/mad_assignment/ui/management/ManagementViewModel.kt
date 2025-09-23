@@ -47,9 +47,7 @@ class ManagementViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 travelPackageRepository.deletePackage(packageId)
-                // Optionally add success feedback logic here
             } catch (e: Exception) {
-                // Optionally add error feedback logic here
             }
         }
     }
@@ -58,7 +56,6 @@ class ManagementViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 tripRepository.deleteTrip(tripId)
-                // Optionally add success feedback logic here
             } catch (e: Exception) {
 
             }

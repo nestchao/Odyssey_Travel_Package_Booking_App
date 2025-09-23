@@ -421,42 +421,6 @@ fun RowScope.EnhancedInfoColumn(
     }
 }
 
-class CustomMapWebViewClient : WebViewClient() {
-    private val TAG = "MapWebViewClient"
-
-    override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-        super.onPageStarted(view, url, favicon)
-        Log.d(TAG, "Page started loading: $url")
-    }
-
-    override fun onPageFinished(view: WebView?, url: String?) {
-        super.onPageFinished(view, url)
-        Log.d(TAG, "Page finished loading: $url")
-    }
-
-    override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
-        super.onReceivedError(view, request, error)
-        val errorMessage = "Error loading URL: ${request?.url} - Description: ${error?.description} (Code: ${error?.errorCode})"
-        Log.e(TAG, errorMessage)
-        // Optionally, display a Toast or a message in the UI
-    }
-
-    // This method is for API < 23
-    @Suppress("DEPRECATION")
-    override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
-        super.onReceivedError(view, errorCode, description, failingUrl)
-        val errorMessage = "Error loading URL (deprecated): $failingUrl - Description: $description (Code: $errorCode)"
-        Log.e(TAG, errorMessage)
-    }
-
-    // Prevents URLs from opening in the default browser when clicked inside the WebView
-    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-        // Only load if it's the iframe source, otherwise handle as needed
-        // For maps, usually we want to keep it in the WebView.
-        return false // Allow WebView to load the URL
-    }
-}
-
 @Composable
 fun EnhancedLocationSection(itineraryTrips: Map<Int, List<Trip>>) {
     // --- DYNAMIC LOGIC: Find the very first trip of the whole itinerary ---
@@ -472,7 +436,6 @@ fun EnhancedLocationSection(itineraryTrips: Map<Int, List<Trip>>) {
         }
     }
 
-    // --- DYNAMIC LOGIC: Create the iframe HTML from the found trip ---
     val mapHtml = if (previewTrip != null && previewTrip.geoPoint != null) {
         val lat = previewTrip.geoPoint.latitude
         val lon = previewTrip.geoPoint.longitude
@@ -480,8 +443,8 @@ fun EnhancedLocationSection(itineraryTrips: Map<Int, List<Trip>>) {
         """
         <iframe
           src="https://maps.google.com/maps?q=@$lat,$lon&z=15&output=embed"
-          width="600"
-          height="450"
+          width="370"
+          height="300"
           style="border:0;"
           allowfullscreen
           loading="lazy">
@@ -532,7 +495,6 @@ fun EnhancedLocationSection(itineraryTrips: Map<Int, List<Trip>>) {
                                 loadDataWithBaseURL(null, mapHtml, "text/html", "UTF-8", null)
                             }
                         },
-                        // Update block to reload if the underlying data changes
                         update = {
                             it.loadDataWithBaseURL(null, mapHtml, "text/html", "UTF-8", null)
                         }
@@ -540,10 +502,9 @@ fun EnhancedLocationSection(itineraryTrips: Map<Int, List<Trip>>) {
 
                     ExtendedFloatingActionButton(
                         onClick = {
-                            // --- DYNAMIC LOGIC: Build route from ALL itinerary trips ---
                             val allTripsSorted = itineraryTrips.keys.sorted()
                                 .flatMap { day -> itineraryTrips[day].orEmpty() }
-                                .filter { it.geoPoint != null } // Only use trips that have a location
+                                .filter { it.geoPoint != null }
 
                             if (allTripsSorted.isEmpty()) {
                                 Toast.makeText(context, "No locations available for this route.", Toast.LENGTH_SHORT).show()
