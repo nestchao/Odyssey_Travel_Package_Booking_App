@@ -71,7 +71,7 @@ class CartViewModel @Inject constructor(
 
     val cartUser = Cart(
         cartId = "cart12345",
-        userId = "user123",
+        userId = "SgxyJlBfRpXK6U5bvWLoguwEHlB2",
         cartItemIds = listOf(cartItemA.cartItemId, cartItemB.cartItemId),
         totalAmount = 7500.00,
         finalAmount = 7500.00,
@@ -313,7 +313,7 @@ class CartViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val result = Result.success(Unit) // TODO: Update cart item - cartRepository.updateCartItemInCart(cartId, updatedCartItem)
+                val result = cartRepository.updateCartItemInCart(cartId, updatedCartItem)
                 if (result.isSuccess) {
                     _uiState.update { state ->
                         if (state is CartUiState.Success) {
@@ -345,7 +345,7 @@ class CartViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 if (currentState.cart != null) {
-                    // TODO: Update cart - cartRepository.updateCart(currentState.cart.cartId)
+                    cartRepository.updateCart(currentState.cart.cartId)
                 }
             } catch (e: Exception) {
                 _uiState.value = CartUiState.Error(e.message ?: "Failed to proceed to checkout")

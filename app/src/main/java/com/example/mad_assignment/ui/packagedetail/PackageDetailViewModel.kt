@@ -130,12 +130,15 @@ class PackageDetailViewModel @Inject constructor(
     /*
      TODO: add function to pass the value to cart
      fun addToCart(){
-        val cartItem = CartItem(
+        val newCartItem = CartItem(
             packageId = packageId,
             departureDate = (uiState.value as? PackageDetailUiState.Success)?.selectedDeparture,
             paxCounts = (uiState.value as? PackageDetailUiState.Success)?.paxCounts ?: emptyMap(),
             totalPrice = (uiState.value as? PackageDetailUiState.Success)?.totalPrice ?: 0.0
         )
         // Add to cart repository
+        // get userId from current user and cartId from cartRepository.getCartByUserId(userId)
+        cartRepository.addItemToCart(userId, cartId, newCartItem)
      }
-     */}
+     */
+}

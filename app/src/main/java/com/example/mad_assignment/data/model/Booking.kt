@@ -15,7 +15,6 @@ data class Booking(
     val discountAmount: Double = 0.0, // get from payment
     val taxAmount: Double = 0.0, // get from payment
     val totalAmount: Double = 0.0, // update from payment the total price after tax, discount, etc
-    val departureDate: DepartureDate? = null, // TODO: update from cart item with new package data class
     val startBookingDate: Timestamp? = null, // get from cart item
     val endBookingDate: Timestamp? = null, // get from cart item
     val createdAt: Timestamp? = null,
