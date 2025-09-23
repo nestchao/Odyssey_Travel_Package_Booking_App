@@ -1,4 +1,4 @@
-package com.example.mad_assignment.ui.admin
+package com.example.mad_assignment.ui.admindashboard
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

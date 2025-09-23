@@ -1,4 +1,4 @@
-package com.example.mad_assignment.ui.admin
+package com.example.mad_assignment.ui.admindashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

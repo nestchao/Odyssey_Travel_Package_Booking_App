@@ -1,6 +1,7 @@
-package com.example.mad_assignment.ui.admin
+package com.example.mad_assignment.ui.admindashboard
 
 import com.example.mad_assignment.data.model.User
+import com.example.mad_assignment.data.model.UserType
 
 data class DashboardStats(
     val totalUsers: Int = 0,
@@ -39,7 +40,7 @@ sealed interface AdminDashboardUiState {
         val recentActivity: List<RecentActivity>,
         val isRefreshing: Boolean = false
     ) : AdminDashboardUiState {
-        val isAdmin: Boolean get() = currentUser.userType == com.example.mad_assignment.data.model.UserType.ADMIN
+        val isAdmin: Boolean get() = currentUser.userType == UserType.ADMIN
     }
 
     data class Error(
