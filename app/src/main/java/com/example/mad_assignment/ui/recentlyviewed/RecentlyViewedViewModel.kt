@@ -50,7 +50,6 @@ class RecentlyViewedViewModel @Inject constructor(
 
                 Log.d("RecentlyViewedVM", "Found ${recentlyViewedItems.size} recently viewed items")
 
-                // Fetch the actual travel packages
                 val packages = mutableListOf<TravelPackage>()
 
                 for (item in recentlyViewedItems) {

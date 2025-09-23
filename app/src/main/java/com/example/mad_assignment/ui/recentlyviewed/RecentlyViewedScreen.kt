@@ -34,19 +34,26 @@ fun RecentlyViewedScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showClearDialog by remember { mutableStateOf(false) }
 
+    // Refresh when the screen is composed or recomposed
+    LaunchedEffect(Unit) {
+        viewModel.loadRecentlyViewed()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-//                        text = viewModel.getCurrentUserId() ?: "",
                         text = "Recently Viewed",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = {
+                        viewModel.loadRecentlyViewed() // Refresh before going back
+                        onNavigateBack()
+                    }) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back"
@@ -54,6 +61,18 @@ fun RecentlyViewedScreen(
                     }
                 },
                 actions = {
+                    // Refresh button - always show
+                    IconButton(
+                        onClick = { viewModel.loadRecentlyViewed() }
+                    ) {
+                        Icon(
+                            Icons.Outlined.Refresh,
+                            contentDescription = "Refresh",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // Clear button - only show when there are items
                     if (uiState is RecentlyViewedUiState.Success &&
                         (uiState as RecentlyViewedUiState.Success).recentlyViewedPackages.isNotEmpty()) {
                         IconButton(
@@ -105,7 +124,11 @@ fun RecentlyViewedScreen(
                         ) { travelPackage ->
                             RecentlyViewedPackageCard(
                                 travelPackage = travelPackage,
-                                onClick = { onPackageClick(travelPackage.packageId) }
+                                onClick = {
+                                    // Refresh before navigating to ensure latest data
+                                    viewModel.loadRecentlyViewed()
+                                    onPackageClick(travelPackage.packageId)
+                                }
                             )
                         }
                     }
