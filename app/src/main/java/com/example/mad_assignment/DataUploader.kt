@@ -106,7 +106,7 @@ object DataUploader {
             pricing = mapOf("Adult" to 899.00, "Child" to 599.00),
             itineraries = itinerary,
             packageOption = packageOptions,
-            status = PackageStatus.AVAILABLE,
+            status = TravelPackage.PackageStatus.AVAILABLE,
             createdAt = Timestamp.now()
         )
 
@@ -143,7 +143,7 @@ object DataUploader {
             pricing = mapOf("Adult" to 1150.00, "Child" to 750.00),
             itineraries = itinerary,
             packageOption = listOf(createDepartureOption(1, 3), createDepartureOption(2, 3, 20, 18)),
-            status = PackageStatus.AVAILABLE,
+            status = TravelPackage.PackageStatus.AVAILABLE,
             createdAt = Timestamp.now()
         )
         batch.set(packageDocRef, penangPackage)
@@ -179,7 +179,7 @@ object DataUploader {
             pricing = mapOf("Adult" to 1499.00, "Child" to 999.00),
             itineraries = itinerary,
             packageOption = listOf(createDepartureOption(2, 3, 10, 10)), // This one is sold out
-            status = PackageStatus.SOLD_OUT,
+            status = TravelPackage.PackageStatus.SOLD_OUT,
             createdAt = Timestamp.now()
         )
         batch.set(packageDocRef, langkawiPackage)
