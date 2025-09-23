@@ -218,8 +218,7 @@ fun WishlistPackageCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                // If you have images, you can use AsyncImage here
-                // For now, showing a placeholder icon
+                // Placeholder icon
                 Icon(
                     Icons.Outlined.Favorite,
                     contentDescription = null,
@@ -301,18 +300,6 @@ fun WishlistPackageCard(
                     }
                 }
             }
-
-//            // Remove button
-//            IconButton(
-//                onClick = onRemove,
-//                modifier = Modifier.align(Alignment.Top)
-//            ) {
-//                Icon(
-//                    Icons.Default.Delete,
-//                    contentDescription = "Remove from wishlist",
-//                    tint = MaterialTheme.colorScheme.error
-//                )
-//            }
         }
     }
 }
