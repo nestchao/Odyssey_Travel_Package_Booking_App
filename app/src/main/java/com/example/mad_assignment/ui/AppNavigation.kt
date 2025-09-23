@@ -32,8 +32,8 @@ import com.example.mad_assignment.ui.aboutus.AboutUsScreen
 import com.example.mad_assignment.ui.aboutus.AboutUsViewModel
 import com.example.mad_assignment.ui.accountdetail.AccountDetailsScreen
 import com.example.mad_assignment.ui.accountdetail.AccountDetailsViewModel
-import com.example.mad_assignment.ui.admin.AdminDashboardScreen
-import com.example.mad_assignment.ui.admin.AdminDashboardViewModel
+import com.example.mad_assignment.ui.admindashboard.AdminDashboardScreen
+import com.example.mad_assignment.ui.admindashboard.AdminDashboardViewModel
 import com.example.mad_assignment.ui.changepassword.ChangePasswordScreen
 import com.example.mad_assignment.ui.changepassword.ChangePasswordViewModel
 import com.example.mad_assignment.ui.explore.ExploreScreen
