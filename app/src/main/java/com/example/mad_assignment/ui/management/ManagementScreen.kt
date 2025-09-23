@@ -1,6 +1,5 @@
 package com.example.mad_assignment.ui.management
 
-import ManagementViewModel
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
