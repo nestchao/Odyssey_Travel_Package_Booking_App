@@ -5,8 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mad_assignment.data.model.Notification
 import com.example.mad_assignment.data.model.ScheduledNotification
-import com.example.mad_assignment.data.respository.NotificationRepository
+import com.example.mad_assignment.data.repository.NotificationRepository
 import com.example.mad_assignment.worker.NotificationScheduler
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +22,8 @@ import java.util.UUID
 
 class NotificationsViewModel(
     private val repository: NotificationRepository,
-    private val context: Context
+    private val context: Context,
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
 ) : ViewModel() {
     private val _filter = MutableStateFlow(NotificationFilter.ALL)
     val filter: StateFlow<NotificationFilter> = _filter.asStateFlow()
@@ -336,9 +338,8 @@ class NotificationsViewModel(
         }
     }
 
-    // TODO: Replace with actual user ID retrieval
-    private fun getCurrentUserId(): String {
-        return "current_user_id"
+    private fun getCurrentUserId(): String? {
+        return auth.currentUser?.uid
     }
 
     /**

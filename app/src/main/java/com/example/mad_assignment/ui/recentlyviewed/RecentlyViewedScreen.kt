@@ -39,6 +39,7 @@ fun RecentlyViewedScreen(
             TopAppBar(
                 title = {
                     Text(
+//                        text = viewModel.getCurrentUserId() ?: "",
                         text = "Recently Viewed",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold

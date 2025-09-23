@@ -5,7 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mad_assignment.data.model.TravelPackage
 import com.example.mad_assignment.data.repository.TravelPackageRepository
-import com.example.mad_assignment.data.respository.RecentlyViewedRepository
+import com.example.mad_assignment.data.repository.RecentlyViewedRepository
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,14 +17,16 @@ import javax.inject.Inject
 @HiltViewModel
 class RecentlyViewedViewModel @Inject constructor(
     private val recentlyViewedRepository: RecentlyViewedRepository,
-    private val travelPackageRepository: TravelPackageRepository
+    private val travelPackageRepository: TravelPackageRepository,
+    private val auth: FirebaseAuth
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<RecentlyViewedUiState>(RecentlyViewedUiState.Loading)
     val uiState: StateFlow<RecentlyViewedUiState> = _uiState.asStateFlow()
 
-    // TODO: Replace with actual user ID from authentication
-    private val currentUserId = "current_user_id"
+    fun getCurrentUserId(): String? {
+        return auth.currentUser?.uid
+    }
 
     init {
         loadRecentlyViewed()
@@ -31,6 +34,7 @@ class RecentlyViewedViewModel @Inject constructor(
 
     fun loadRecentlyViewed() {
         viewModelScope.launch {
+            val currentUserId = getCurrentUserId()
             _uiState.value = RecentlyViewedUiState.Loading
 
             try {
@@ -83,6 +87,7 @@ class RecentlyViewedViewModel @Inject constructor(
 
     fun clearRecentlyViewed() {
         viewModelScope.launch {
+            val currentUserId = getCurrentUserId()
             try {
                 Log.d("RecentlyViewedVM", "Clearing recently viewed items")
                 recentlyViewedRepository.clearRecentlyViewed(currentUserId)

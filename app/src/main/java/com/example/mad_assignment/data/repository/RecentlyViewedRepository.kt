@@ -1,4 +1,4 @@
-package com.example.mad_assignment.data.respository
+package com.example.mad_assignment.data.repository
 
 import com.example.mad_assignment.data.model.RecentlyViewedItem
 import com.google.firebase.firestore.FirebaseFirestore
@@ -10,10 +10,10 @@ import javax.inject.Singleton
 class RecentlyViewedRepository @Inject constructor(
     private val firestore: FirebaseFirestore
 ) {
-    private fun getRecentlyViewedCollection(userId: String) =
-        firestore.collection("users").document(userId).collection("recently_viewed")
+    private fun getRecentlyViewedCollection(userId: String?) =
+        firestore.collection("users").document(userId.toString()).collection("recently_viewed")
 
-    suspend fun addToRecentlyViewed(userId: String, packageId: String) {
+    suspend fun addToRecentlyViewed(userId: String?, packageId: String) {
         // Remove if already exists to avoid duplicates
         val existingQuery = getRecentlyViewedCollection(userId)
             .whereEqualTo("packageId", packageId)
@@ -42,7 +42,7 @@ class RecentlyViewedRepository @Inject constructor(
         }
     }
 
-    suspend fun getRecentlyViewed(userId: String): List<RecentlyViewedItem> {
+    suspend fun getRecentlyViewed(userId: String?): List<RecentlyViewedItem> {
         val snapshot = getRecentlyViewedCollection(userId)
             .orderBy("viewedAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .get()
@@ -50,7 +50,7 @@ class RecentlyViewedRepository @Inject constructor(
         return snapshot.toObjects(RecentlyViewedItem::class.java)
     }
 
-    suspend fun clearRecentlyViewed(userId: String) {
+    suspend fun clearRecentlyViewed(userId: String?) {
         val snapshot = getRecentlyViewedCollection(userId).get().await()
 
         // Delete all documents in batches to avoid hitting Firestore limits

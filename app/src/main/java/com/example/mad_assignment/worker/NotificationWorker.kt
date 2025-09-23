@@ -15,7 +15,8 @@ import com.example.mad_assignment.data.datasource.NotificationsDataSource
 import com.example.mad_assignment.data.datasource.ScheduledNotificationDataSource
 import com.example.mad_assignment.data.model.Notification
 import com.example.mad_assignment.data.model.ScheduledNotification
-import com.example.mad_assignment.data.respository.NotificationRepository
+import com.example.mad_assignment.data.repository.NotificationRepository
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +27,8 @@ import java.util.UUID
 
 class NotificationWorker(
     context: Context,
-    workerParams: WorkerParameters
+    workerParams: WorkerParameters,
+    private val auth: FirebaseAuth
 ) : CoroutineWorker(context, workerParams) {
 
     companion object {
@@ -92,7 +94,7 @@ class NotificationWorker(
                     // Send to specific user only
                     notificationRepository.createNotificationForUser(notification, targetUserId)
                 } else {
-                    val currentUserId = getCurrentUserId(applicationContext)
+                    val currentUserId = getCurrentUserId()
                     notificationRepository.createNotificationForUser(notification, currentUserId)
                 }
 
@@ -115,11 +117,13 @@ class NotificationWorker(
         }
     }
 
-    private fun getCurrentUserId(context: Context): String {
-        // Implement user authentication logic here TODO
-        // Return the current user's ID from SharedPreferences, Auth, etc.
-        val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-        return sharedPreferences.getString("user_id", "default_user_id") ?: "default_user_id"
+//    private fun getCurrentUserId(context: Context): String {
+//        val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+//        return sharedPreferences.getString("user_id", "default_user_id") ?: "default_user_id"
+//    }
+
+    private fun getCurrentUserId(): String? {
+        return auth.currentUser?.uid
     }
 
     // Add this method for sending FCM to specific user
@@ -305,7 +309,7 @@ object NotificationScheduler {
     /**
      * Reschedule all pending notifications (call this on app start)
      */
-    suspend fun rescheduleAllNotifications(context: Context, userId: String) {
+    suspend fun rescheduleAllNotifications(context: Context, userId: String?) {
         val scheduledDataSource = ScheduledNotificationDataSource(firestore = FirebaseFirestore.getInstance())
         val result = scheduledDataSource.getDueScheduledNotifications()
 

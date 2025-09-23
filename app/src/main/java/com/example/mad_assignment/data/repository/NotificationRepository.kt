@@ -1,4 +1,4 @@
-package com.example.mad_assignment.data.respository
+package com.example.mad_assignment.data.repository
 
 import android.content.Context
 import com.example.mad_assignment.data.datasource.NotificationsDataSource
@@ -6,6 +6,7 @@ import com.example.mad_assignment.data.datasource.ScheduledNotificationDataSourc
 import com.example.mad_assignment.data.model.Notification
 import com.example.mad_assignment.data.model.ScheduledNotification
 import com.example.mad_assignment.worker.NotificationScheduler
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import java.sql.Timestamp
@@ -16,10 +17,14 @@ import javax.inject.Singleton
 class NotificationRepository @Inject constructor(
     private val dataSource: NotificationsDataSource,
     private val scheduledDataSource: ScheduledNotificationDataSource,
-    private val context: Context
+    private val context: Context,
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
 ) {
-    // TODO: GET CURRENT USER ID
-    private var currentUserId: String = "current_user_id"
+    private var currentUserId: String? = getCurrentUserId()
+
+    private fun getCurrentUserId(): String? {
+        return auth.currentUser?.uid
+    }
 
     /**
      * Set the current user ID (call this after authentication)
@@ -54,7 +59,7 @@ class NotificationRepository @Inject constructor(
         title: String,
         message: String,
         type: Notification.NotificationType = Notification.NotificationType.GENERAL,
-        userId: String = currentUserId
+        userId: String? = currentUserId
     ): Result<String> {
         val notification = Notification(
             id = dataSource.generateNotificationId(),
@@ -76,7 +81,7 @@ class NotificationRepository @Inject constructor(
         message: String,
         type: Notification.NotificationType,
         scheduledTime: Long,
-        userId: String = currentUserId
+        userId: String? = currentUserId
     ): Result<String> {
         val scheduledNotification = ScheduledNotification(
             id = scheduledDataSource.generateScheduledNotificationId(),
@@ -262,17 +267,7 @@ class NotificationRepository @Inject constructor(
         return scheduledDataSource.getScheduledNotifications(getCurrentUserId())
     }
 
-    // TODO: Replace with actual user authentication logic
-    /**
-     * Get current user ID - implement this based on your auth system
-     * For now, using a placeholder. Replace with your actual user ID logic.
-     */
-    private fun getCurrentUserId(): String {
-        // For example: FirebaseAuth.getInstance().currentUser?.uid ?: "default_user" / BOON YEW CODE
-        return "default_user" // Placeholder
-    }
-
-    suspend fun createNotificationForUser(notification: Notification, userId: String): Result<String> {
+    suspend fun createNotificationForUser(notification: Notification, userId: String?): Result<String> {
         return dataSource.addNotification(notification, userId)
     }
 

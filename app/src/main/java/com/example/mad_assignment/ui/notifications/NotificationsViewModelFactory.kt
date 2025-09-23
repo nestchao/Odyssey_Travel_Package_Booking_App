@@ -3,7 +3,7 @@ package com.example.mad_assignment.ui.notifications
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.example.mad_assignment.data.respository.NotificationRepository
+import com.example.mad_assignment.data.repository.NotificationRepository
 
 class NotificationsViewModelFactory(
     private val repository: NotificationRepository,

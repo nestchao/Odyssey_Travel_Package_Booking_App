@@ -41,7 +41,7 @@ class ScheduledNotificationDataSource @Inject constructor(
         val scheduledTime: FirebaseTimestamp = FirebaseTimestamp.now(),
         val createdAt: FirebaseTimestamp = FirebaseTimestamp.now(),
         val status: String = "PENDING",
-        val userId: String = ""
+        val userId: String? = ""
     ) {
         /**
          * Convert to domain ScheduledNotification model
@@ -70,7 +70,7 @@ class ScheduledNotificationDataSource @Inject constructor(
             /**
              * Create FirestoreScheduledNotification from domain ScheduledNotification model
              */
-            fun fromScheduledNotification(scheduledNotification: ScheduledNotification, userId: String): FirestoreScheduledNotification {
+            fun fromScheduledNotification(scheduledNotification: ScheduledNotification, userId: String?): FirestoreScheduledNotification {
                 return FirestoreScheduledNotification(
                     id = scheduledNotification.id,
                     title = scheduledNotification.title,
@@ -88,7 +88,7 @@ class ScheduledNotificationDataSource @Inject constructor(
     /**
      * Get all scheduled notifications for a user
      */
-    fun getScheduledNotifications(userId: String): Flow<List<ScheduledNotification>> {
+    fun getScheduledNotifications(userId: String?): Flow<List<ScheduledNotification>> {
         return callbackFlow {
             val listenerRegistration = firestore
                 .collection(SCHEDULED_NOTIFICATIONS_COLLECTION)
@@ -116,7 +116,7 @@ class ScheduledNotificationDataSource @Inject constructor(
     /**
      * Add a new scheduled notification
      */
-    suspend fun addScheduledNotification(scheduledNotification: ScheduledNotification, userId: String): Result<String> {
+    suspend fun addScheduledNotification(scheduledNotification: ScheduledNotification, userId: String?): Result<String> {
         return try {
             val firestoreScheduledNotification = FirestoreScheduledNotification.fromScheduledNotification(scheduledNotification, userId)
 

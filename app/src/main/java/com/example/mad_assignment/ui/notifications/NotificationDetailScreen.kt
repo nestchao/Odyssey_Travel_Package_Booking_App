@@ -40,7 +40,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mad_assignment.data.datasource.NotificationsDataSource
 import com.example.mad_assignment.data.datasource.ScheduledNotificationDataSource
 import com.example.mad_assignment.data.model.Notification
-import com.example.mad_assignment.data.respository.NotificationRepository
+import com.example.mad_assignment.data.repository.NotificationRepository
 import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
 import java.util.Locale

@@ -45,7 +45,7 @@ class NotificationsDataSource @Inject constructor(
         val timestamp: FirebaseTimestamp = FirebaseTimestamp.now(),
         val type: String = Notification.NotificationType.GENERAL.name,
         val status: String = Notification.Status.UNREAD.name,
-        val userId: String = "",
+        val userId: String? = "",
         val createdAt: FirebaseTimestamp = FirebaseTimestamp.now(),
         val updatedAt: FirebaseTimestamp = FirebaseTimestamp.now()
     ) {
@@ -75,7 +75,7 @@ class NotificationsDataSource @Inject constructor(
             /**
              * Create FirestoreNotification from domain Notification model
              */
-            fun fromNotification(notification: Notification, userId: String): FirestoreNotification {
+            fun fromNotification(notification: Notification, userId: String?): FirestoreNotification {
                 return FirestoreNotification(
                     id = notification.id,
                     title = notification.title,
@@ -107,11 +107,11 @@ class NotificationsDataSource @Inject constructor(
     /**
      * Get all notifications for a specific user as Flow
      */
-    fun getUserNotifications(userId: String): Flow<List<Notification>> {
+    fun getUserNotifications(userId: String?): Flow<List<Notification>> {
         return callbackFlow {
             val listenerRegistration = firestore
                 .collection(USERS_COLLECTION)
-                .document(userId)
+                .document(userId.toString())
                 .collection(USER_NOTIFICATIONS_SUBCOLLECTION)
                 .orderBy(FIELD_TIMESTAMP, Query.Direction.DESCENDING)
                 .addSnapshotListener { snapshot, error ->
@@ -164,11 +164,11 @@ class NotificationsDataSource @Inject constructor(
     /**
      * Get a specific notification by ID for a user
      */
-    fun getNotificationById(userId: String, id: String): Flow<Notification?> {
+    fun getNotificationById(userId: String?, id: String): Flow<Notification?> {
         return callbackFlow {
             val listenerRegistration = firestore
                 .collection(USERS_COLLECTION)
-                .document(userId)
+                .document(userId.toString())
                 .collection(USER_NOTIFICATIONS_SUBCOLLECTION)
                 .document(id)
                 .addSnapshotListener { snapshot, error ->
@@ -189,13 +189,13 @@ class NotificationsDataSource @Inject constructor(
     /**
      * Add a new notification for a user
      */
-    suspend fun addNotification(notification: Notification, userId: String): Result<String> {
+    suspend fun addNotification(notification: Notification, userId: String?): Result<String> {
         return try {
             val firestoreNotification = FirestoreNotification.fromNotification(notification, userId)
 
             val documentRef = firestore
                 .collection(USERS_COLLECTION)
-                .document(userId)
+                .document(userId.toString())
                 .collection(USER_NOTIFICATIONS_SUBCOLLECTION)
                 .document(notification.id)
 
@@ -241,13 +241,13 @@ class NotificationsDataSource @Inject constructor(
      */
     suspend fun updateNotificationStatus(
         notificationId: String,
-        userId: String,
+        userId: String?,
         status: Notification.Status
     ): Result<Unit> {
         return try {
             firestore
                 .collection(USERS_COLLECTION)
-                .document(userId)
+                .document(userId.toString())
                 .collection(USER_NOTIFICATIONS_SUBCOLLECTION)
                 .document(notificationId)
                 .update(
@@ -266,32 +266,32 @@ class NotificationsDataSource @Inject constructor(
     /**
      * Mark notification as read
      */
-    suspend fun markAsRead(notificationId: String, userId: String): Result<Unit> {
+    suspend fun markAsRead(notificationId: String, userId: String?): Result<Unit> {
         return updateNotificationStatus(notificationId, userId, Notification.Status.READ)
     }
 
     /**
      * Mark notification as archived
      */
-    suspend fun markAsArchived(notificationId: String, userId: String): Result<Unit> {
+    suspend fun markAsArchived(notificationId: String, userId: String?): Result<Unit> {
         return updateNotificationStatus(notificationId, userId, Notification.Status.ARCHIVED)
     }
 
     /**
      * Delete a notification (soft delete by updating status)
      */
-    suspend fun deleteNotification(notificationId: String, userId: String): Result<Unit> {
+    suspend fun deleteNotification(notificationId: String, userId: String?): Result<Unit> {
         return updateNotificationStatus(notificationId, userId, Notification.Status.DELETED)
     }
 
     /**
      * Permanently delete a notification
      */
-    suspend fun permanentlyDeleteNotification(notificationId: String, userId: String): Result<Unit> {
+    suspend fun permanentlyDeleteNotification(notificationId: String, userId: String?): Result<Unit> {
         return try {
             firestore
                 .collection(USERS_COLLECTION)
-                .document(userId)
+                .document(userId.toString())
                 .collection(USER_NOTIFICATIONS_SUBCOLLECTION)
                 .document(notificationId)
                 .delete()
@@ -305,13 +305,13 @@ class NotificationsDataSource @Inject constructor(
     /**
      * Mark all notifications as read for a user
      */
-    suspend fun markAllAsRead(userId: String): Result<Unit> {
+    suspend fun markAllAsRead(userId: String?): Result<Unit> {
         return try {
             val batch = firestore.batch()
 
             val unreadNotifications = firestore
                 .collection(USERS_COLLECTION)
-                .document(userId)
+                .document(userId.toString())
                 .collection(USER_NOTIFICATIONS_SUBCOLLECTION)
                 .whereEqualTo(FIELD_STATUS, Notification.Status.UNREAD.name)
                 .get()
@@ -337,11 +337,11 @@ class NotificationsDataSource @Inject constructor(
     /**
      * Get unread notification count for a user
      */
-    fun getUnreadCount(userId: String): Flow<Int> {
+    fun getUnreadCount(userId: String?): Flow<Int> {
         return callbackFlow {
             val listenerRegistration = firestore
                 .collection(USERS_COLLECTION)
-                .document(userId)
+                .document(userId.toString())
                 .collection(USER_NOTIFICATIONS_SUBCOLLECTION)
                 .whereEqualTo(FIELD_STATUS, Notification.Status.UNREAD.name)
                 .addSnapshotListener { snapshot, error ->
@@ -363,13 +363,13 @@ class NotificationsDataSource @Inject constructor(
      * Get notifications by type for a user
      */
     fun getNotificationsByType(
-        userId: String,
+        userId: String?,
         type: Notification.NotificationType
     ): Flow<List<Notification>> {
         return callbackFlow {
             val listenerRegistration = firestore
                 .collection(USERS_COLLECTION)
-                .document(userId)
+                .document(userId.toString())
                 .collection(USER_NOTIFICATIONS_SUBCOLLECTION)
                 .whereEqualTo(FIELD_TYPE, type.name)
                 .orderBy(FIELD_TIMESTAMP, Query.Direction.DESCENDING)
@@ -396,13 +396,13 @@ class NotificationsDataSource @Inject constructor(
      * Get notifications by status for a user
      */
     fun getNotificationsByStatus(
-        userId: String,
+        userId: String?,
         status: Notification.Status
     ): Flow<List<Notification>> {
         return callbackFlow {
             val listenerRegistration = firestore
                 .collection(USERS_COLLECTION)
-                .document(userId)
+                .document(userId.toString())
                 .collection(USER_NOTIFICATIONS_SUBCOLLECTION)
                 .whereEqualTo(FIELD_STATUS, status.name)
                 .orderBy(FIELD_TIMESTAMP, Query.Direction.DESCENDING)
@@ -428,7 +428,7 @@ class NotificationsDataSource @Inject constructor(
     /**
      * Delete old notifications (older than specified days)
      */
-    suspend fun deleteOldNotifications(userId: String, daysOld: Int): Result<Unit> {
+    suspend fun deleteOldNotifications(userId: String?, daysOld: Int): Result<Unit> {
         return try {
             val cutoffDate = FirebaseTimestamp(
                 java.util.Date(System.currentTimeMillis() - (daysOld * 24 * 60 * 60 * 1000L))
@@ -438,7 +438,7 @@ class NotificationsDataSource @Inject constructor(
 
             val oldNotifications = firestore
                 .collection(USERS_COLLECTION)
-                .document(userId)
+                .document(userId.toString())
                 .collection(USER_NOTIFICATIONS_SUBCOLLECTION)
                 .whereLessThan(FIELD_TIMESTAMP, cutoffDate)
                 .get()
