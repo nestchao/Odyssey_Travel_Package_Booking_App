@@ -1,0 +1,59 @@
+TODO: Add notifications from other modules (notificationViewModel needed)
+
+val notificationViewModel: NotificationsViewModel = viewModel(
+    factory = NotificationsViewModelFactory(
+        NotificationRepository(
+            NotificationsDataSource(FirebaseFirestore.getInstance()),
+            ScheduledNotificationDataSource(FirebaseFirestore.getInstance()),
+            LocalContext.current
+        ),
+        LocalContext.current
+    )
+)
+
+TODO: Sample Function Calling (refer below)
+1. Directly sent to user (sendUserNotification)
+2. Send to all users registered (scheduleNotification)
+
+// Payment success
+notificationViewModel.sendUserNotification(
+    userId = "?",
+    title = "Payment Successful",
+    message = "Your payment of RM? was processed successfully. Transaction ID: ?",
+    type = Notification.NotificationType.PAYMENT
+)
+
+// Reminder
+notificationViewModel.sendUserNotification(
+    userId = "?",
+    title = "Workout Reminder",
+    message = "Don’t forget your 7 PM training session!",
+    type = Notification.NotificationType.REMINDER
+)
+
+// General info
+notificationViewModel.sendUserNotification(
+    userId = "?",
+    title = "Welcome!",
+    message = "Thanks for signing up to Odyssey 🎉",
+    type = Notification.NotificationType.GENERAL
+)
+
+// Schedule a broadcast to all users
+notificationViewModel.scheduleNotification(
+    title = "System Maintenance",
+    message = "Scheduled maintenance tonight at 2 AM",
+    type = Notification.NotificationType.ANNOUNCEMENT,
+    scheduledTime = System.currentTimeMillis() + 60000, // 1 minute from now
+    broadcastToAll = true
+)
+
+// Schedule notification for specific user only
+notificationViewModel.scheduleNotification(
+    title = "Package Announcement",
+    message = "Newest Package Launch! Check it out!",
+    type = Notification.NotificationType.PACKAGE,
+    scheduledTime = System.currentTimeMillis() + 120000, // 2 minute from now
+    broadcastToAll = false,
+    targetUserId = "1"
+)

@@ -232,7 +232,7 @@ private fun ProfileContent(
                 )
                 QuickActionItem(
                     icon = Icons.Filled.Schedule,
-                    title = "Recently View",
+                    title = "Recently Viewed",
                     onClick = onNavigateToRecentlyViewed
                 )
             }

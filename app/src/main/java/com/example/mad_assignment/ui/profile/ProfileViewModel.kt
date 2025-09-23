@@ -1,5 +1,7 @@
 package com.example.mad_assignment.ui.profile
 
+import android.content.ContentValues.TAG
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mad_assignment.data.repository.ProfilePicRepository
