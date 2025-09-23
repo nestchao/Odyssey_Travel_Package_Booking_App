@@ -1,10 +1,7 @@
 package com.example.mad_assignment.ui
 
-
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.livedata.observeAsState
-
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,17 +10,20 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
@@ -34,8 +34,6 @@ import com.example.mad_assignment.ui.aboutus.AboutUsScreen
 import com.example.mad_assignment.ui.aboutus.AboutUsViewModel
 import com.example.mad_assignment.ui.accountdetail.AccountDetailsScreen
 import com.example.mad_assignment.ui.accountdetail.AccountDetailsViewModel
-import com.example.mad_assignment.ui.admin.AdminDashboardScreen
-import com.example.mad_assignment.ui.admin.AdminDashboardViewModel
 import com.example.mad_assignment.ui.admindashboard.AdminDashboardScreen
 import com.example.mad_assignment.ui.admindashboard.AdminDashboardViewModel
 import com.example.mad_assignment.ui.changepassword.ChangePasswordScreen
@@ -53,9 +51,6 @@ import com.example.mad_assignment.ui.notifications.NotificationSchedulerScreen
 import com.example.mad_assignment.ui.notifications.NotificationsScreen
 import com.example.mad_assignment.ui.packagedetail.PackageDetailScreen
 import com.example.mad_assignment.ui.profile.ProfileScreen
-import com.example.mad_assignment.ui.profile.ProfileViewModel
-import com.example.mad_assignment.ui.recentlyviewed.RecentlyViewedScreen
-import com.example.mad_assignment.ui.profile.ProfileViewModel // FIXED: Added missing import
 import com.example.mad_assignment.ui.recentlyviewed.RecentlyViewedScreen
 import com.example.mad_assignment.ui.search.SearchScreen
 import com.example.mad_assignment.ui.settings.SettingsScreen
@@ -65,8 +60,6 @@ import com.example.mad_assignment.ui.signin.SignInViewModel
 import com.example.mad_assignment.ui.signup.SignUpScreen
 import com.example.mad_assignment.ui.signup.SignUpViewModel
 import com.example.mad_assignment.ui.wishlist.WishlistScreen
-import com.example.mad_assignment.ui.wishlist.WishlistScreen
-import com.example.mad_assignment.ui.MainViewModel
 
 @Composable
 fun AppNavigation(){
@@ -128,10 +121,12 @@ fun AppNavigation(){
 
 
         composable("phone_main") { navBackStackEntry ->
-
+            val mainViewModel: MainViewModel = hiltViewModel()
             PhoneContainerScreen(
+                mainViewModel = mainViewModel,
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
                 onNavigateToSearch = { navController.navigate("search") },
+                onNavigateToManagement = { navController.navigate("manage") },
                 onBellClick = { navController.navigate("notifications") },
                 onSignOut = { navController.navigate("signin") { popUpTo(navController.graph.startDestinationId) { inclusive = true } } },
                 onNavigateToAccountDetails = { navController.navigate("account_detail") },
@@ -142,6 +137,7 @@ fun AppNavigation(){
         }
 
         composable("tablet_main") { navBackStackEntry ->
+            val mainViewModel: MainViewModel = hiltViewModel()
             TabletContainerScreen(
                 mainViewModel = mainViewModel,
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
@@ -205,8 +201,6 @@ fun AppNavigation(){
                 onPackageClick = { packageId -> navController.navigate("detail/$packageId") }
             )
         }
-        // --- End of merged screens ---
-
 
         composable("manage") {
             ManagementScreen(
@@ -295,8 +289,9 @@ private fun PhoneContainerScreen(
     onSignOut: () -> Unit,
     onNavigateToAccountDetails : () -> Unit,
     onNavigateToSettings : () -> Unit,
-    onNavigateToRecentlyViewed : () -> Unit,
-    onNavigateToWishlist : () -> Unit,
+    onBellClick: (String) -> Unit,
+    onNavigateToWishlist: () -> Unit,
+    onNavigateToRecentlyViewed: () -> Unit,
 ) {
     val user by mainViewModel.currentUser.collectAsState()
     val contentNavController = rememberNavController()
@@ -330,20 +325,20 @@ private fun PhoneContainerScreen(
     }
 }
 
-// --- MODIFIED: Container for the Tablet Layout ---
 @Composable
 private fun TabletContainerScreen(
     mainViewModel: MainViewModel,
     onNavigateToDetail: (String) -> Unit,
-    onBellClick: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
     onNavigateToManagement: () -> Unit,
     onSignOut: () -> Unit,
     onNavigateToAccountDetails : () -> Unit,
     onNavigateToSettings : () -> Unit,
-    onNavigateToRecentlyViewed : () -> Unit,
-    onNavigateToWishlist : () -> Unit,
+    onBellClick: (String) -> Unit,
+    onNavigateToWishlist: () -> Unit,
+    onNavigateToRecentlyViewed: () -> Unit,
 ) {
+    val user by mainViewModel.currentUser.collectAsState()
     val contentNavController = rememberNavController()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
@@ -382,7 +377,6 @@ private fun TabletContainerScreen(
             }
         }
     } else {
-        // Portrait tablet uses the same layout as the phone, passing the new parameters through
         PhoneContainerScreen(
             mainViewModel = mainViewModel,
             onNavigateToDetail = onNavigateToDetail,
@@ -393,11 +387,11 @@ private fun TabletContainerScreen(
             onNavigateToSettings = onNavigateToSettings,
             onBellClick = onBellClick,
             onNavigateToWishlist = onNavigateToWishlist,
+            onNavigateToRecentlyViewed = onNavigateToRecentlyViewed,
         )
     }
 }
 
-// MERGED: Added onBellClick parameter
 private fun NavGraphBuilder.sharedAppGraph(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
@@ -423,7 +417,6 @@ private data class SideNavItem(
     val filledIcon: ImageVector
 )
 
-// --- Navigation Rail for Tablet ---
 @Composable
 private fun TabletSideNavigation(
     modifier: Modifier = Modifier,
