@@ -8,6 +8,7 @@ import com.example.mad_assignment.data.model.TravelPackage
 import com.example.mad_assignment.data.model.Trip
 import com.example.mad_assignment.ui.home.TravelPackageWithImages
 import com.example.mad_assignment.ui.packagedetail.PackageDetailData
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
 import javax.inject.Inject
@@ -73,6 +74,7 @@ class TravelPackageRepository @Inject constructor(
         return dataSource.getDepartureDatesForPackage(packageId)
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun getTravelPackagesWithImages(): Flow<List<TravelPackageWithImages>> {
         return dataSource.getAllTravelPackages()
             .flatMapLatest { packages ->

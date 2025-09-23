@@ -4,10 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mad_assignment.data.model.Cart
 import com.example.mad_assignment.data.model.CartItem
-import com.example.mad_assignment.data.model.DepartureDate
 import com.example.mad_assignment.data.model.TravelPackage
 import com.example.mad_assignment.data.repository.CartRepository
 import com.example.mad_assignment.data.repository.TravelPackageRepository
+import com.example.mad_assignment.ui.packagedetail.PackageDetailData
 import com.google.firebase.Timestamp
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,15 +24,10 @@ class CartViewModel @Inject constructor(
 ) : ViewModel() {
 
     // Placeholder Value
+    /*
     val cartItemA = CartItem(
         cartItemId = "itemA",
         packageId = "Xz1AZkbiOY7lR1W3xGDU",
-        departureDate = DepartureDate(
-            id = "departureDate1",
-            packageId = "Xz1AZkbiOY7lR1W3xGDU",
-            startDate = Timestamp(System.currentTimeMillis() / 1000 + 86400, 0),
-            capacity = 10
-        ),
         basePrice = 3000.00,
         totalPrice = 3000.00,
         noOfAdults = 2,
@@ -47,12 +42,6 @@ class CartViewModel @Inject constructor(
     val cartItemB = CartItem(
         cartItemId = "itemB",
         packageId = "Xz1AZkbiOY7lR1W3xGDU",
-        departureDate = DepartureDate(
-            id = "departureDate2",
-            packageId = "Xz1AZkbiOY7lR1W3xGDU",
-            startDate = Timestamp(System.currentTimeMillis() / 1000 + 86400*2, 0),
-            capacity = 10
-        ),
         basePrice = 4500.00,
         totalPrice = 4500.00,
         noOfAdults = 1,
@@ -68,12 +57,6 @@ class CartViewModel @Inject constructor(
     val expiredCartItem = CartItem(
         cartItemId = "itemC",
         packageId = "Xz1AZkbiOY7lR1W3xGDU",
-        departureDate = DepartureDate(
-            id = "departureDate3",
-            packageId = "Xz1AZkbiOY7lR1W3xGDU",
-            startDate = Timestamp(System.currentTimeMillis() / 1000, 0),
-            capacity = 10
-        ),
         basePrice = 1500.00,
         totalPrice = 1800.00,
         noOfAdults = 1,
@@ -98,12 +81,13 @@ class CartViewModel @Inject constructor(
     )
 
     val cartUserNull = Cart()
+    */
     // Placeholder Value
 
     private val _uiState = MutableStateFlow<CartUiState>(CartUiState.Loading)
     val uiState: StateFlow<CartUiState> = _uiState.asStateFlow()
 
-    private val currentUserId = "user123" // TODO: Get from user account module
+    private val currentUserId = "SgxyJlBfRpXK6U5bvWLoguwEHlB2" // TODO: Get from user account module
 
     init {
         loadCart()
@@ -115,7 +99,7 @@ class CartViewModel @Inject constructor(
 
             try {
                 // get user cart
-                val cartResult = Result.success(cartUser) // TODO: Load user cart - cartRepository.getCartByUserId(currentUserId)
+                val cartResult = cartRepository.getCartByUserId(currentUserId)
                 val cart = cartResult.getOrNull()
 
                 if (cart == null || cart.cartItemIds.isEmpty()) {
@@ -124,7 +108,8 @@ class CartViewModel @Inject constructor(
                 }
 
                 // get all cart items in user cart
-                val cartItemsResult = Result.success(listOf(cartItemA, cartItemB, expiredCartItem)) // TODO: Get cart items from CartRepository
+                val cartItemsResult = cartRepository.getCartItemsForCart(cartResult.getOrNull()?.cartItemIds
+                    ?: emptyList())
                 val cartItems = cartItemsResult.getOrDefault(emptyList())
 
                 // separate cart items
@@ -143,9 +128,9 @@ class CartViewModel @Inject constructor(
                 val packageIds = availableItems.map { it.packageId }.toSet()
 
                 // load packages in cart
-                val packages = mutableListOf<TravelPackage?>()
+                val packages = mutableListOf<PackageDetailData?>()
                 packageIds.forEach { id ->
-                    val packageResult = travelPackageRepository.getTravelPackage(id)
+                    val packageResult = travelPackageRepository.getPackageWithImages(id)
                     packages.add(packageResult)
                 }
 
@@ -202,7 +187,7 @@ class CartViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val result = Result.success(Unit) // TODO: Remove item from cart - cartRepository.removeItemFromCart(cartItemId)
+                val result = cartRepository.removeItemFromCart(currentState.cart.cartId, cartItemId)
                 if (result.isSuccess) {
                     refreshCart()
                 } else {
@@ -240,30 +225,24 @@ class CartViewModel @Inject constructor(
         }
     }
 
-    fun updateCartItemDetails(cartItemId: String, newAdults: Int, newChildren: Int) {
+    fun updateCartItemDetails(cartItem: CartItem, newAdults: Int, newChildren: Int) {
         val currentState = _uiState.value
         if (currentState !is CartUiState.Success || currentState.cart == null) return
 
         viewModelScope.launch {
             try {
-                // TODO: Get package pricing details from TravelPackageRepository
-                // val packageDetails = travelPackageRepository.getTravelPackage(packageId)
-                // val pricingMap = packageDetails.pricingMap // Map<String, Double> for adult/child pricing
+                 val packageDetails = travelPackageRepository.getTravelPackage(cartItem.packageId)
+                 val pricingMap = packageDetails?.pricing
 
-                val currentItem = currentState.availableItems.find { it.cartItemId == cartItemId }
+                val currentItem = currentState.availableItems.find { it.cartItemId == cartItem.cartItemId }
                 if (currentItem == null) {
                     _uiState.value = CartUiState.Error("Cart item not found")
                     return@launch
                 }
 
-                // TODO: Calculate new pricing based on package pricing map
-                // val adultPrice = pricingMap["adult"] ?: 0.0
-                // val childPrice = pricingMap["child"] ?: 0.0
-                // val newTotalPrice = (adultPrice * newAdults) + (childPrice * newChildren)
-
-                // Placeholder price calculation
-                val pricePerTraveler = currentItem.totalPrice / currentItem.totalTravelerCount
-                val newTotalPrice = pricePerTraveler * (newAdults + newChildren)
+                 val adultPrice = pricingMap?.get("Adult") ?: 0.0
+                 val childPrice = pricingMap?.get("Child") ?: 0.0
+                 val newTotalPrice = (adultPrice * newAdults) + (childPrice * newChildren)
 
                 val updatedCartItem = currentItem.copy(
                     noOfAdults = newAdults,
@@ -273,12 +252,12 @@ class CartViewModel @Inject constructor(
                     updatedAt = Timestamp.now()
                 )
 
-                val result = Result.success(Unit) // TODO: Update cart item - cartRepository.updateCartItemInCart(cartItemId, updatedCartItem)
+                val result = cartRepository.updateCartItemInCart(cartItem.cartItemId, updatedCartItem)
                 if (result.isSuccess) {
                     _uiState.update { state ->
                         if (state is CartUiState.Success) {
                             val updatedAvailableItems = state.availableItems.map { item ->
-                                if (item.cartItemId == cartItemId) {
+                                if (item.cartItemId == cartItem.cartItemId) {
                                     updatedCartItem
                                 } else {
                                     item

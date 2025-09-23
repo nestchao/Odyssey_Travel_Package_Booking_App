@@ -20,6 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -30,9 +32,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.mad_assignment.data.model.CartItem
-import com.example.mad_assignment.data.model.DepartureDate
 import com.example.mad_assignment.data.model.TravelPackage
+import com.example.mad_assignment.ui.packagedetail.PackageDetailData
+import com.example.mad_assignment.util.toDataUri
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.*
@@ -142,7 +146,7 @@ fun CartScreen(
                             onDismiss = { viewModel.stopEditingItem() },
                             onSave = { adults, children ->
                                 viewModel.updateCartItemDetails(
-                                    successState.editingItem!!.cartItemId,
+                                    successState.editingItem!!,
                                     adults,
                                     children
                                 )
@@ -153,7 +157,7 @@ fun CartScreen(
                     if (successState.showPackageDetails && successState.selectedPackageId != null) {
                         PackageDetailsDialog(
                             packageId = successState.selectedPackageId,
-                            packageDetails = successState.selectedPackage,
+                            packageDetails = successState.selectedPackage?.travelPackage,
                             onDismiss = { viewModel.hidePackageDetails() }
                         )
                     }
@@ -583,7 +587,7 @@ private fun CartContent(
                 items = state.availableItems,
                 key = { it.cartItemId }
             ) { cartItem ->
-                val packageDetails = state.packages.find { it?.packageId == cartItem.packageId }
+                val packageDetails = state.packages.find { it?.travelPackage?.packageId == cartItem.packageId }
                 CartItemCard(
                     cartItem = cartItem,
                     packageDetails = packageDetails,
@@ -628,7 +632,7 @@ private fun CartContent(
                 items = state.expiredItems,
                 key = { it.cartItemId }
             ) { cartItem ->
-                val packageDetails = state.packages.find { it?.packageId == cartItem.packageId }
+                val packageDetails = state.packages.find { it?.travelPackage?.packageId == cartItem.packageId }
                 ExpiredCartItemCard(
                     cartItem = cartItem,
                     packageDetails = packageDetails,
@@ -646,7 +650,7 @@ private fun CartContent(
 @Composable
 private fun CartItemCard(
     cartItem: CartItem,
-    packageDetails: TravelPackage?,
+    packageDetails: PackageDetailData?,
     isSelected: Boolean,
     onPackageDetailsClick: () -> Unit,
     onQuickViewClick: () -> Unit,
@@ -689,12 +693,13 @@ private fun CartItemCard(
                         .clip(RoundedCornerShape(8.dp)),
                     color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
-                    if (!packageDetails?.imageUrls.isNullOrEmpty()) {
+                    if (!packageDetails?.images.isNullOrEmpty()) {
                         AsyncImage(
-                            model = packageDetails.imageUrls.firstOrNull(),
-                            contentDescription = "Package image",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            model = ImageRequest.Builder(LocalContext.current).data(toDataUri(
+                                packageDetails.images.firstOrNull()?.base64Data)).build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
                         )
                     } else {
                         Box(contentAlignment = Alignment.Center) {
@@ -712,7 +717,7 @@ private fun CartItemCard(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = packageDetails?.packageName ?: "Package",
+                        text = packageDetails?.travelPackage?.packageName ?: "Package",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -722,7 +727,7 @@ private fun CartItemCard(
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    if (cartItem.departureDate != null) {
+                    if (cartItem.startDate != null) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 Icons.Outlined.CalendarToday,
@@ -732,7 +737,7 @@ private fun CartItemCard(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Departure: ${cartItem.departureDate.startDate.formatDate()}",
+                                text = "Departure: ${cartItem.startDate.formatDate()}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -865,7 +870,7 @@ private fun CartItemCard(
 @Composable
 private fun ExpiredCartItemCard(
     cartItem: CartItem,
-    packageDetails: TravelPackage?,
+    packageDetails: PackageDetailData?,
     onDeleteClick: () -> Unit
 ) {
     Card(
@@ -888,13 +893,13 @@ private fun ExpiredCartItemCard(
                     .clip(RoundedCornerShape(8.dp)),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             ) {
-                if (!packageDetails?.imageUrls.isNullOrEmpty()) {
+                if (!packageDetails?.images.isNullOrEmpty()) {
                     AsyncImage(
-                        model = packageDetails.imageUrls.firstOrNull(),
-                        contentDescription = "Package image",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                        alpha = 0.5f
+                        model = ImageRequest.Builder(LocalContext.current).data(toDataUri(
+                            packageDetails.images.firstOrNull()?.base64Data)).build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
                 } else {
                     Box(contentAlignment = Alignment.Center) {
@@ -912,7 +917,7 @@ private fun ExpiredCartItemCard(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = packageDetails?.packageName ?: "Package",
+                    text = packageDetails?.travelPackage?.packageName ?: "Package",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
