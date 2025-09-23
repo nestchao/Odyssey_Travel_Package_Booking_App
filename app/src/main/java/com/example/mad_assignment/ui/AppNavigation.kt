@@ -49,8 +49,14 @@ import com.example.mad_assignment.ui.home.HomeScreen
 import com.example.mad_assignment.ui.management.ManagementScreen
 import com.example.mad_assignment.ui.managetravelpackage.manageTravelPackageScreen
 import com.example.mad_assignment.ui.managetrip.ManageTripScreen
+// MERGED: Re-added imports for Notifications, Wishlist, Recently Viewed, etc.
+import com.example.mad_assignment.ui.notifications.NotificationDetailsScreen
+import com.example.mad_assignment.ui.notifications.NotificationSchedulerScreen
+import com.example.mad_assignment.ui.notifications.NotificationsScreen
 import com.example.mad_assignment.ui.packagedetail.PackageDetailScreen
 import com.example.mad_assignment.ui.profile.ProfileScreen
+import com.example.mad_assignment.ui.profile.ProfileViewModel
+import com.example.mad_assignment.ui.recentlyviewed.RecentlyViewedScreen
 import com.example.mad_assignment.ui.search.SearchScreen
 import com.example.mad_assignment.ui.settings.SettingsScreen
 import com.example.mad_assignment.ui.settings.SettingsViewModel
@@ -58,6 +64,7 @@ import com.example.mad_assignment.ui.signin.SignInScreen
 import com.example.mad_assignment.ui.signin.SignInViewModel
 import com.example.mad_assignment.ui.signup.SignUpScreen
 import com.example.mad_assignment.ui.signup.SignUpViewModel
+import com.example.mad_assignment.ui.wishlist.WishlistScreen
 import com.example.mad_assignment.ui.MainViewModel
 
 @Composable
@@ -74,6 +81,7 @@ fun AppNavigation(){
             val viewModel: SignInViewModel = hiltViewModel()
             SignInScreen(
                 viewModel = viewModel,
+                // MERGED: Kept the logic to handle different UserTypes
                 onSignInSuccess = { user ->
                     val destination = when (user.userType) {
                         UserType.ADMIN -> "admin_dashboard"
@@ -92,7 +100,7 @@ fun AppNavigation(){
             val viewModel: SignUpViewModel = hiltViewModel()
             SignUpScreen(
                 viewModel = viewModel,
-                onSignUpSuccess = { user ->
+                onSignUpSuccess = {
                     navController.navigate(mainDestination) {
                         popUpTo("signin") { inclusive = true }
                     }
@@ -111,6 +119,7 @@ fun AppNavigation(){
         }
 
         composable("phone_main") { navBackStackEntry ->
+            // MERGED: Re-added the profile refresh logic from File 1
             val shouldRefresh by navBackStackEntry
                 .savedStateHandle
                 .getLiveData<Boolean>("profile_updated")
@@ -122,13 +131,23 @@ fun AppNavigation(){
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
                 onNavigateToSearch = { navController.navigate("search") },
                 onNavigateToManagement = { navController.navigate("manage") },
+                // MERGED: Re-added navigation for restored screens
+                onBellClick = { navController.navigate("notifications") },
+                onNavigateToWishlist = { navController.navigate("wishlist") },
+                onNavigateToRecentlyViewed = { navController.navigate("recentlyViewed") },
                 onSignOut = { navController.navigate("signin") { popUpTo(navController.graph.startDestinationId) { inclusive = true } } },
                 onNavigateToAccountDetails = { navController.navigate("account_detail") },
-                onNavigateToSettings = { navController.navigate("setting") }
+                onNavigateToSettings = { navController.navigate("setting") },
+                // MERGED: Pass down the profile refresh state
+                shouldRefreshProfile = shouldRefresh,
+                onProfileRefreshDone = {
+                    navBackStackEntry.savedStateHandle["profile_updated"] = false
+                }
             )
         }
 
         composable("tablet_main") { navBackStackEntry ->
+            // MERGED: Re-added the profile refresh logic from File 1
             val shouldRefresh by navBackStackEntry
                 .savedStateHandle
                 .getLiveData<Boolean>("profile_updated")
@@ -140,9 +159,18 @@ fun AppNavigation(){
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
                 onNavigateToSearch = { navController.navigate("search") },
                 onNavigateToManagement = { navController.navigate("manage") },
+                // MERGED: Re-added navigation for restored screens
+                onBellClick = { navController.navigate("notifications") },
+                onNavigateToWishlist = { navController.navigate("wishlist") },
+                onNavigateToRecentlyViewed = { navController.navigate("recentlyViewed") },
                 onSignOut = { navController.navigate("signin") { popUpTo(navController.graph.startDestinationId) { inclusive = true } } },
                 onNavigateToAccountDetails = { navController.navigate("account_detail") },
-                onNavigateToSettings = { navController.navigate("setting") }
+                onNavigateToSettings = { navController.navigate("setting") },
+                // MERGED: Pass down the profile refresh state
+                shouldRefreshProfile = shouldRefresh,
+                onProfileRefreshDone = {
+                    navBackStackEntry.savedStateHandle["profile_updated"] = false
+                }
             )
         }
 
@@ -159,6 +187,44 @@ fun AppNavigation(){
                 onPackageClick = { packageId -> navController.navigate("detail/$packageId") }
             )
         }
+
+        // --- MERGED: Re-added Notifications, Wishlist, and Recently Viewed screens from File 1 ---
+        composable("notifications") {
+            NotificationsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onSendClick = { navController.navigate("notificationScheduler") },
+                onNotificationClick = { notificationId ->
+                    navController.navigate("notificationDetail/$notificationId")
+                }
+            )
+        }
+
+        composable("notificationDetail/{id}") { backStackEntry ->
+            val id = backStackEntry.arguments?.getString("id") ?: return@composable
+            NotificationDetailsScreen(
+                notificationId = id,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable("notificationScheduler") {
+            NotificationSchedulerScreen(onNavigateBack = { navController.popBackStack() })
+        }
+
+        composable("wishlist") {
+            WishlistScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onPackageClick = { packageId -> navController.navigate("detail/$packageId") }
+            )
+        }
+
+        composable("recentlyViewed") {
+            RecentlyViewedScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onPackageClick = { packageId -> navController.navigate("detail/$packageId") }
+            )
+        }
+        // --- End of re-added screens ---
 
         composable("manage") {
             ManagementScreen(
@@ -188,7 +254,13 @@ fun AppNavigation(){
             val viewModel: AccountDetailsViewModel = hiltViewModel()
             AccountDetailsScreen(
                 viewModel = viewModel,
-                onNavigateBack = {
+                // MERGED: Re-added the 'updated' boolean to support profile refresh
+                onNavigateBack = { updated ->
+                    if (updated) {
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle
+                            ?.set("profile_updated", true)
+                    }
                     navController.popBackStack()
                 },
             )
@@ -247,14 +319,16 @@ private fun PhoneContainerScreen(
     onSignOut: () -> Unit,
     onNavigateToAccountDetails : () -> Unit,
     onNavigateToSettings : () -> Unit,
+    // MERGED: Added parameters for restored features
+    onBellClick: () -> Unit,
+    onNavigateToWishlist: () -> Unit,
+    onNavigateToRecentlyViewed: () -> Unit,
+    shouldRefreshProfile: Boolean,
+    onProfileRefreshDone: () -> Unit
 ) {
     val user by mainViewModel.currentUser.collectAsState()
-    LaunchedEffect(user) {
-        user?.let {
-            Log.d("AppNavigation", "Current User (Phone): ${it.firstName} ${it.lastName}")
-        }
-    }
     val contentNavController = rememberNavController()
+
     Scaffold(
         bottomBar = { EnhancedBottomNavigationBar(navController = contentNavController) }
     ) { innerPadding ->
@@ -266,14 +340,29 @@ private fun PhoneContainerScreen(
             sharedAppGraph(
                 onNavigateToDetail = onNavigateToDetail,
                 onNavigateToSearch = onNavigateToSearch,
-                onNavigateToManagement = onNavigateToManagement
+                onNavigateToManagement = onNavigateToManagement,
+                onBellClick = onBellClick // MERGED: Pass bell click callback
             )
 
             composable("profile") {
+                // MERGED: Get ProfileViewModel for refresh logic
+                val viewModel: ProfileViewModel = hiltViewModel()
+
+                // MERGED: Re-added refresh effect
+                if (shouldRefreshProfile) {
+                    LaunchedEffect(Unit) {
+                        viewModel.loadProfile(forceServer = true)
+                        onProfileRefreshDone()
+                    }
+                }
+
                 ProfileScreen(
-                    viewModel = hiltViewModel(),
+                    viewModel = viewModel,
                     onNavigateToAccountDetails = onNavigateToAccountDetails,
                     onNavigateToSettings = onNavigateToSettings,
+                    // MERGED: Pass new navigation callbacks to ProfileScreen
+                    onNavigateToWishlist = onNavigateToWishlist,
+                    onNavigateToRecentlyViewed = onNavigateToRecentlyViewed,
                     onSignOut = onSignOut
                 )
             }
@@ -290,13 +379,14 @@ private fun TabletContainerScreen(
     onSignOut: () -> Unit,
     onNavigateToAccountDetails : () -> Unit,
     onNavigateToSettings : () -> Unit,
+    // MERGED: Added parameters for restored features
+    onBellClick: () -> Unit,
+    onNavigateToWishlist: () -> Unit,
+    onNavigateToRecentlyViewed: () -> Unit,
+    shouldRefreshProfile: Boolean,
+    onProfileRefreshDone: () -> Unit
 ) {
     val user by mainViewModel.currentUser.collectAsState()
-    LaunchedEffect(user) {
-        user?.let {
-            Log.d("AppNavigation", "Current User (Tablet): ${it.firstName} ${it.lastName}")
-        }
-    }
     val contentNavController = rememberNavController()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
@@ -316,24 +406,35 @@ private fun TabletContainerScreen(
                 sharedAppGraph(
                     onNavigateToDetail = onNavigateToDetail,
                     onNavigateToSearch = onNavigateToSearch,
-                    onNavigateToManagement = onNavigateToManagement
+                    onNavigateToManagement = onNavigateToManagement,
+                    onBellClick = onBellClick // MERGED: Pass bell click callback
                 )
                 composable("favorites") { PlaceholderScreen(screenName = "Favorites") }
-                composable("settings") {
-                    PlaceholderScreen(screenName = "Settings")
-                }
+                composable("settings") { PlaceholderScreen(screenName = "Settings") }
 
                 composable("profile") {
+                    val viewModel: ProfileViewModel = hiltViewModel()
+
+                    if (shouldRefreshProfile) {
+                        LaunchedEffect(Unit) {
+                            viewModel.loadProfile(forceServer = true)
+                            onProfileRefreshDone()
+                        }
+                    }
+
                     ProfileScreen(
-                        viewModel = hiltViewModel(),
+                        viewModel = viewModel,
                         onNavigateToAccountDetails = onNavigateToAccountDetails,
                         onNavigateToSettings = onNavigateToSettings,
+                        onNavigateToWishlist = onNavigateToWishlist,
+                        onNavigateToRecentlyViewed = onNavigateToRecentlyViewed,
                         onSignOut = onSignOut
                     )
                 }
             }
         }
     } else {
+        // MERGED: Ensure all parameters are passed to the portrait tablet view
         PhoneContainerScreen(
             mainViewModel = mainViewModel,
             onNavigateToDetail = onNavigateToDetail,
@@ -342,20 +443,28 @@ private fun TabletContainerScreen(
             onSignOut = onSignOut,
             onNavigateToAccountDetails = onNavigateToAccountDetails,
             onNavigateToSettings = onNavigateToSettings,
+            onBellClick = onBellClick,
+            onNavigateToWishlist = onNavigateToWishlist,
+            onNavigateToRecentlyViewed = onNavigateToRecentlyViewed,
+            shouldRefreshProfile = shouldRefreshProfile,
+            onProfileRefreshDone = onProfileRefreshDone
         )
     }
 }
 
+// MERGED: Added onBellClick to the shared graph
 private fun NavGraphBuilder.sharedAppGraph(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
-    onNavigateToManagement: () -> Unit
+    onNavigateToManagement: () -> Unit,
+    onBellClick: () -> Unit
 ) {
     composable("home") {
         HomeScreen(
             onPackageClick = onNavigateToDetail,
             onNavigateToSearch = onNavigateToSearch,
-            onNavigateToManagement = onNavigateToManagement
+            onNavigateToManagement = onNavigateToManagement,
+            onBellClick = onBellClick // Pass to HomeScreen
         )
     }
     composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
@@ -370,6 +479,7 @@ private data class SideNavItem(
     val filledIcon: ImageVector
 )
 
+// This composable is taken from the second file as it's superior (dynamic user data)
 @Composable
 private fun TabletSideNavigation(
     modifier: Modifier = Modifier,

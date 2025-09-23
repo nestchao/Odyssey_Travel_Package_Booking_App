@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -632,9 +633,30 @@ fun EnhancedImageHeader(
                 }
             }
 
+            val viewModel: PackageDetailViewModel = hiltViewModel()
+            val isInWishlist by viewModel.isInWishlist.collectAsStateWithLifecycle()
+
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(onClick = { /* TODO: Wishlist */ }, shape = CircleShape, color = Color.Black.copy(alpha = 0.4f), modifier = Modifier.size(48.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.FavoriteBorder, contentDescription = "Favorite", tint = Color.White, modifier = Modifier.size(24.dp)) }
+                Surface(onClick = { /* TODO: Share */ }, shape = CircleShape, color = Color.Black.copy(alpha = 0.4f), modifier = Modifier.size(48.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(24.dp)) }
+                }
+
+                Surface(
+                    onClick = {
+                        viewModel.toggleFavButton()
+                    },
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.4f),
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (isInWishlist) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            contentDescription = "Favorite",
+                            tint = if (isInWishlist) Color.Red else Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
         }
