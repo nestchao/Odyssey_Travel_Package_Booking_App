@@ -3,12 +3,16 @@ package com.example.mad_assignment.data.repository
 import com.example.mad_assignment.data.datasource.UserDataSource
 import com.example.mad_assignment.data.model.User
 import com.example.mad_assignment.data.model.UserType
+import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
 class UserRepository @Inject constructor(
     private val userDataSource: UserDataSource
 ) {
 
+    fun getUserStream(userId: String): Flow<Result<User>> {
+        return userDataSource.getUserStream(userId)
+    }
 
     // ✅ Get all users
     suspend fun getAllUsers(): List<User> {

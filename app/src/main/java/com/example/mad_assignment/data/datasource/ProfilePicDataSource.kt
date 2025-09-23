@@ -5,6 +5,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 
 @Singleton
 class ProfilePicDataSource @Inject constructor(
@@ -38,6 +41,33 @@ class ProfilePicDataSource @Inject constructor(
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+    suspend fun getProfilePictureStream(userId: String): Flow<Result<ProfilePic>> = callbackFlow {
+        val docRef = firestore.collection(PROFILE_PIC_COLLECTION).document(userId)
+
+        val listener = docRef.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                trySend(Result.failure(error))
+                close(error)
+                return@addSnapshotListener
+            }
+
+            if (snapshot != null && snapshot.exists()) {
+                val profilePic = snapshot.toObject(ProfilePic::class.java)
+                if (profilePic != null) {
+                    // Emit the latest data into the flow
+                    trySend(Result.success(profilePic))
+                } else {
+                    trySend(Result.failure(Exception("Failed to parse profile picture data.")))
+                }
+            } else {
+                // You could treat this as an error or a "not found" state
+                trySend(Result.failure(Exception("Profile picture does not exist.")))
+            }
+        }
+        awaitClose {
+            listener.remove()
         }
     }
 }
