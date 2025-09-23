@@ -27,11 +27,15 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
+import com.example.mad_assignment.R
+import com.example.mad_assignment.data.model.User
 import com.example.mad_assignment.data.model.UserType
 import com.example.mad_assignment.ui.aboutus.AboutUsScreen
 import com.example.mad_assignment.ui.aboutus.AboutUsViewModel
 import com.example.mad_assignment.ui.accountdetail.AccountDetailsScreen
 import com.example.mad_assignment.ui.accountdetail.AccountDetailsViewModel
+import com.example.mad_assignment.ui.admin.AdminDashboardScreen
+import com.example.mad_assignment.ui.admin.AdminDashboardViewModel
 import com.example.mad_assignment.ui.admindashboard.AdminDashboardScreen
 import com.example.mad_assignment.ui.admindashboard.AdminDashboardViewModel
 import com.example.mad_assignment.ui.changepassword.ChangePasswordScreen
@@ -41,12 +45,17 @@ import com.example.mad_assignment.ui.forgetpassword.ForgotPasswordScreen
 import com.example.mad_assignment.ui.forgetpassword.ForgotPasswordViewModel
 import com.example.mad_assignment.ui.home.EnhancedBottomNavigationBar
 import com.example.mad_assignment.ui.home.HomeScreen
+import com.example.mad_assignment.ui.management.ManagementScreen
+import com.example.mad_assignment.ui.managetravelpackage.manageTravelPackageScreen
+import com.example.mad_assignment.ui.managetrip.ManageTripScreen
 import com.example.mad_assignment.ui.notifications.NotificationDetailsScreen
 import com.example.mad_assignment.ui.notifications.NotificationSchedulerScreen
 import com.example.mad_assignment.ui.notifications.NotificationsScreen
 import com.example.mad_assignment.ui.packagedetail.PackageDetailScreen
 import com.example.mad_assignment.ui.profile.ProfileScreen
 import com.example.mad_assignment.ui.profile.ProfileViewModel
+import com.example.mad_assignment.ui.recentlyviewed.RecentlyViewedScreen
+import com.example.mad_assignment.ui.profile.ProfileViewModel // FIXED: Added missing import
 import com.example.mad_assignment.ui.recentlyviewed.RecentlyViewedScreen
 import com.example.mad_assignment.ui.search.SearchScreen
 import com.example.mad_assignment.ui.settings.SettingsScreen
@@ -56,6 +65,8 @@ import com.example.mad_assignment.ui.signin.SignInViewModel
 import com.example.mad_assignment.ui.signup.SignUpScreen
 import com.example.mad_assignment.ui.signup.SignUpViewModel
 import com.example.mad_assignment.ui.wishlist.WishlistScreen
+import com.example.mad_assignment.ui.wishlist.WishlistScreen
+import com.example.mad_assignment.ui.MainViewModel
 
 @Composable
 fun AppNavigation(){
@@ -80,12 +91,8 @@ fun AppNavigation(){
                         popUpTo("signin") { inclusive = true }
                     }
                 },
-                onNavigateToSignUp = {
-                    navController.navigate("signup")
-                },
-                onForgotPassword = {
-                    navController.navigate("forgot_password")
-                }
+                onNavigateToSignUp = { navController.navigate("signup") },
+                onForgotPassword = { navController.navigate("forgot_password") }
             )
         }
 
@@ -136,8 +143,10 @@ fun AppNavigation(){
 
         composable("tablet_main") { navBackStackEntry ->
             TabletContainerScreen(
+                mainViewModel = mainViewModel,
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
                 onNavigateToSearch = { navController.navigate("search") },
+                onNavigateToManagement = { navController.navigate("manage") },
                 onBellClick = { navController.navigate("notifications") },
                 onSignOut = { navController.navigate("signin") { popUpTo(navController.graph.startDestinationId) { inclusive = true } } },
                 onNavigateToAccountDetails = { navController.navigate("account_detail") },
@@ -196,6 +205,32 @@ fun AppNavigation(){
                 onPackageClick = { packageId -> navController.navigate("detail/$packageId") }
             )
         }
+        // --- End of merged screens ---
+
+
+        composable("manage") {
+            ManagementScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAddPackage = { navController.navigate("add_edit_package") },
+                onNavigateToEditPackage = { packageId -> navController.navigate("add_edit_package?packageId=$packageId") },
+                onNavigateToAddTrip = { navController.navigate("add_edit_trip") },
+                onNavigateToEditTrip = { tripId -> navController.navigate("add_edit_trip?tripId=$tripId") }
+            )
+        }
+
+        composable(
+            route = "add_edit_package?packageId={packageId}",
+            arguments = listOf(navArgument("packageId") { type = NavType.StringType; nullable = true })
+        ) {
+            manageTravelPackageScreen(navController = navController)
+        }
+
+        composable(
+            route = "add_edit_trip?tripId={tripId}",
+            arguments = listOf(navArgument("tripId") { type = NavType.StringType; nullable = true })
+        ) {
+            ManageTripScreen(navController = navController)
+        }
 
         composable("account_detail") {
             val viewModel: AccountDetailsViewModel = hiltViewModel()
@@ -253,16 +288,19 @@ fun AppNavigation(){
 
 @Composable
 private fun PhoneContainerScreen(
+    mainViewModel: MainViewModel,
     onNavigateToDetail: (String) -> Unit,
-    onBellClick: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
+    onNavigateToManagement: () -> Unit,
     onSignOut: () -> Unit,
     onNavigateToAccountDetails : () -> Unit,
     onNavigateToSettings : () -> Unit,
     onNavigateToRecentlyViewed : () -> Unit,
     onNavigateToWishlist : () -> Unit,
 ) {
+    val user by mainViewModel.currentUser.collectAsState()
     val contentNavController = rememberNavController()
+
     Scaffold(
         bottomBar = { EnhancedBottomNavigationBar(navController = contentNavController) }
     ) { innerPadding ->
@@ -271,22 +309,20 @@ private fun PhoneContainerScreen(
             startDestination = "home",
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable("home") {
-                HomeScreen(
-                    onPackageClick = onNavigateToDetail,
-                    onNavigateToSearch = onNavigateToSearch,
-                    onBellClick = onBellClick
-                )
-            }
-            composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
-            composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
+            sharedAppGraph(
+                onNavigateToDetail = onNavigateToDetail,
+                onNavigateToSearch = onNavigateToSearch,
+                onNavigateToManagement = onNavigateToManagement,
+                onBellClick = onBellClick
+            )
+
             composable("profile") {
                 ProfileScreen(
                     viewModel = hiltViewModel(),
                     onNavigateToAccountDetails = onNavigateToAccountDetails,
                     onNavigateToSettings = onNavigateToSettings,
-                    onNavigateToRecentlyViewed = onNavigateToRecentlyViewed,
                     onNavigateToWishlist = onNavigateToWishlist,
+                    onNavigateToRecentlyViewed = onNavigateToRecentlyViewed,
                     onSignOut = onSignOut
                 )
             }
@@ -294,11 +330,14 @@ private fun PhoneContainerScreen(
     }
 }
 
+// --- MODIFIED: Container for the Tablet Layout ---
 @Composable
 private fun TabletContainerScreen(
+    mainViewModel: MainViewModel,
     onNavigateToDetail: (String) -> Unit,
     onBellClick: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
+    onNavigateToManagement: () -> Unit,
     onSignOut: () -> Unit,
     onNavigateToAccountDetails : () -> Unit,
     onNavigateToSettings : () -> Unit,
@@ -310,25 +349,23 @@ private fun TabletContainerScreen(
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
     if (isLandscape) {
-        Row {
+        Row(modifier = Modifier.fillMaxSize()) {
             TabletSideNavigation(
-                modifier = Modifier.width(240.dp).fillMaxHeight(),
-                navController = contentNavController
+                modifier = Modifier.width(280.dp).fillMaxHeight(),
+                navController = contentNavController,
+                user = user
             )
             NavHost(
                 navController = contentNavController,
                 startDestination = "home",
                 modifier = Modifier.weight(1f)
             ) {
-                composable("home") {
-                    HomeScreen(
-                        onPackageClick = onNavigateToDetail,
-                        onNavigateToSearch = onNavigateToSearch,
-                        onBellClick = onBellClick
-                    )
-                }
-                composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
-                composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
+                sharedAppGraph(
+                    onNavigateToDetail = onNavigateToDetail,
+                    onNavigateToSearch = onNavigateToSearch,
+                    onNavigateToManagement = onNavigateToManagement,
+                    onBellClick = onBellClick
+                )
                 composable("favorites") { PlaceholderScreen(screenName = "Favorites") }
                 composable("settings") { PlaceholderScreen(screenName = "Settings") }
 
@@ -347,18 +384,37 @@ private fun TabletContainerScreen(
     } else {
         // Portrait tablet uses the same layout as the phone, passing the new parameters through
         PhoneContainerScreen(
+            mainViewModel = mainViewModel,
             onNavigateToDetail = onNavigateToDetail,
-            onBellClick = onBellClick,
             onNavigateToSearch = onNavigateToSearch,
+            onNavigateToManagement = onNavigateToManagement,
             onSignOut = onSignOut,
             onNavigateToAccountDetails = onNavigateToAccountDetails,
             onNavigateToSettings = onNavigateToSettings,
-            onNavigateToRecentlyViewed = onNavigateToRecentlyViewed,
+            onBellClick = onBellClick,
             onNavigateToWishlist = onNavigateToWishlist,
         )
     }
 }
 
+// MERGED: Added onBellClick parameter
+private fun NavGraphBuilder.sharedAppGraph(
+    onNavigateToDetail: (String) -> Unit,
+    onNavigateToSearch: () -> Unit,
+    onNavigateToManagement: () -> Unit,
+    onBellClick: (String) -> Unit
+) {
+    composable("home") {
+        HomeScreen(
+            onPackageClick = onNavigateToDetail,
+            onNavigateToSearch = onNavigateToSearch,
+            onNavigateToManagement = onNavigateToManagement,
+            onBellClick = onBellClick
+        )
+    }
+    composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
+    composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
+}
 
 private data class SideNavItem(
     val label: String,
@@ -367,10 +423,12 @@ private data class SideNavItem(
     val filledIcon: ImageVector
 )
 
+// --- Navigation Rail for Tablet ---
 @Composable
 private fun TabletSideNavigation(
     modifier: Modifier = Modifier,
-    navController: NavController
+    navController: NavController,
+    user: User?
 ) {
     val items = listOf(
         SideNavItem("Home", "home", Icons.Outlined.Home, Icons.Filled.Home),
@@ -395,9 +453,7 @@ private fun TabletSideNavigation(
                 .padding(16.dp)
         ) {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                 ),
@@ -407,11 +463,10 @@ private fun TabletSideNavigation(
                     modifier = Modifier.padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        Icons.Default.TravelExplore,
+                    Image(
+                        painter = painterResource(id = R.drawable.odyssey_logo),
                         contentDescription = null,
-                        modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        modifier = Modifier.size(40.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -449,9 +504,7 @@ private fun TabletSideNavigation(
                             Color.Transparent
                     ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
@@ -508,13 +561,13 @@ private fun TabletSideNavigation(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            "John Doe",
+                            text = if (user != null) "${user.firstName} ${user.lastName}" else "Loading...",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            "Traveler",
+                            text = user?.userType?.name?.replaceFirstChar { it.uppercase() } ?: "Traveler",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
