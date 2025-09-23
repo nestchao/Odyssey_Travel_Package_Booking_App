@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -44,6 +45,7 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.mad_assignment.data.model.TravelPackageWithImages
 import com.example.mad_assignment.util.toDataUri
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
@@ -54,25 +56,43 @@ import java.util.*
 @Composable
 fun HomeScreen(
     onPackageClick: (String) -> Unit,
-    onNavigateToSearch: () -> Unit
+    onNavigateToSearch: () -> Unit,
+    onNavigateToManagement: () -> Unit
 ) {
     val viewModel: HomeViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val configuration = LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
 
-    if (isTablet) {
-        TabletHomeScreen(
-            uiState = uiState,
-            onPackageClick = onPackageClick,
-            onNavigateToSearch = onNavigateToSearch
-        )
-    } else {
-        PhoneHomeScreen(
-            uiState = uiState,
-            onPackageClick = onPackageClick,
-            onNavigateToSearch = onNavigateToSearch
-        )
+    Scaffold(
+        floatingActionButton = {
+            val successState = uiState as? HomeUiState.Success
+            if (successState?.isAdmin == true) {
+                FloatingActionButton(
+                    onClick = { onNavigateToManagement() },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Add new travel package")
+                }
+            }
+        }
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding)) {
+            if (isTablet) {
+                TabletHomeScreen(
+                    uiState = uiState,
+                    onPackageClick = onPackageClick,
+                    onNavigateToSearch = onNavigateToSearch
+                )
+            } else {
+                PhoneHomeScreen(
+                    uiState = uiState,
+                    onPackageClick = onPackageClick,
+                    onNavigateToSearch = onNavigateToSearch
+                )
+            }
+        }
     }
 }
 
@@ -124,12 +144,10 @@ fun EnhancedHomeContent(
                 onPackageClick = onPackageClick
             )
         }
-        item { PopularDestinationsSection() }
         item {
             EnhancedSectionHeader(
                 title = "All Packages",
-                subtitle = "${packages.size} amazing destinations",
-                onViewMoreClick = { /* TODO: View More Functions */ }
+                subtitle = "${packages.size} amazing destinations"
             )
         }
         items(packages, key = { it.travelPackage.packageId }) { travelPackageWithImages ->
@@ -279,17 +297,6 @@ fun EnhancedAroundYouSection(
                     text = "Discover local gems",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            TextButton(
-                onClick = { /* TODO */ },
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    "See All",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
                 )
             }
         }
@@ -513,8 +520,8 @@ fun TabletHomeContent(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(bottom = 24.dp)
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+        contentPadding = PaddingValues(bottom = 32.dp)
     ) {
         item {
             TabletHomeHeader(
@@ -529,12 +536,6 @@ fun TabletHomeContent(
             }
         }
         item {
-            TabletQuickActionsSection(
-                horizontalPadding = horizontalPadding,
-                isLandscape = isLandscape
-            )
-        }
-        item {
             TabletFeaturedSection(
                 featuredPackages = packages.take(if (isLandscape) 4 else 3),
                 onPackageClick = onPackageClick,
@@ -543,22 +544,53 @@ fun TabletHomeContent(
             )
         }
         item {
-            PopularDestinationsSection()
-        }
-        item {
-            EnhancedSectionHeader(
-                title = "All Packages",
-                subtitle = "${packages.size} amazing destinations",
-                onViewMoreClick = { /* TODO: View More Functions */ }
-            )
-        }
-        item {
-            TabletPackagesGrid(
-                packages = packages,
-                onPackageClick = onPackageClick,
-                horizontalPadding = horizontalPadding,
-                isLandscape = isLandscape
-            )
+            // All Packages Section with better separation
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = horizontalPadding),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                ),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp)
+                ) {
+                    // Section Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "All Travel Packages",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${packages.size} amazing destinations to explore",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // Packages Grid
+                    TabletPackagesGrid(
+                        packages = packages,
+                        onPackageClick = onPackageClick,
+                        horizontalPadding = 24.dp,
+                        isLandscape = isLandscape
+                    )
+                }
+            }
         }
     }
 }
@@ -776,17 +808,17 @@ fun TabletHomeHeader(
                         TabletActionButton(
                             icon = Icons.Outlined.ShoppingBag,
                             badge = true,
-                            onClick = { /* TODO */ }
+                            onClick = { /* TODO: Cart Button */ }
                         )
                         TabletActionButton(
                             icon = Icons.Outlined.Notifications,
                             badge = true,
                             badgeText = "3",
-                            onClick = { /* TODO */ }
+                            onClick = { /* TODO: Notifications */ }
                         )
                         TabletActionButton(
                             icon = Icons.Outlined.Person,
-                            onClick = { /* TODO */ }
+                            onClick = { /* TODO: Profile */ }
                         )
                     }
 
@@ -845,13 +877,13 @@ fun TabletHomeHeader(
                         TabletActionButton(
                             icon = Icons.Outlined.ShoppingBag,
                             badge = true,
-                            onClick = { /* TODO */ }
+                            onClick = { /* TODO: Cart */ }
                         )
                         TabletActionButton(
                             icon = Icons.Outlined.Notifications,
                             badge = true,
                             badgeText = "3",
-                            onClick = { /* TODO */ }
+                            onClick = { /* TODO: Notifications */ }
                         )
                     }
                 }
@@ -940,87 +972,6 @@ fun TabletActionButton(
 }
 
 @Composable
-fun TabletQuickActionsSection(
-    horizontalPadding: Dp,
-    isLandscape: Boolean
-) {
-    Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
-        Text(
-            text = "Quick Actions",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        val actions = listOf(
-            Triple("Book Flight", Icons.Default.Flight, Color(0xFF4FC3F7)),
-            Triple("Find Hotels", Icons.Default.Hotel, Color(0xFF66BB6A)),
-            Triple("Rent Car", Icons.Default.DriveEta, Color(0xFFFFB74D)),
-            Triple("Activities", Icons.Default.LocalActivity, Color(0xFFE57373)),
-            Triple("Travel Guide", Icons.Default.MenuBook, Color(0xFFBA68C8)),
-            Triple("Weather", Icons.Default.WbSunny, Color(0xFFFFD54F))
-        )
-
-        val columns = if (isLandscape) 6 else 3
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(columns),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.height(if (isLandscape) 120.dp else 200.dp)
-        ) {
-            items(actions) { (title, icon, color) ->
-                TabletQuickActionItem(
-                    icon = icon,
-                    title = title,
-                    color = color,
-                    onClick = { /* TODO */ }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun TabletQuickActionItem(
-    icon: ImageVector,
-    title: String,
-    color: Color,
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = color.copy(alpha = 0.1f)
-        )
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Icon(
-                icon,
-                contentDescription = title,
-                tint = color,
-                modifier = Modifier.size(32.dp)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
-}
-
-@Composable
 fun TabletFeaturedSection(
     featuredPackages: List<TravelPackageWithImages>,
     onPackageClick: (String) -> Unit,
@@ -1044,24 +995,6 @@ fun TabletFeaturedSection(
                     text = "Handpicked for you",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            TextButton(
-                onClick = { /* TODO */ },
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    "See All",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Icon(
-                    Icons.Default.ArrowForward,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -1432,63 +1365,9 @@ fun WelcomeSection() {
 }
 
 @Composable
-fun PopularDestinationsSection() {
-    Column(modifier = Modifier.padding(vertical = 16.dp)) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Trending Destinations 🔥",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            val destinations = listOf(
-                "🏝️ Langkawi" to Color(0xFF4FC3F7),
-                "🏔️ Cameron" to Color(0xFF66BB6A),
-                "🌊 Penang" to Color(0xFFFFB74D),
-                "🏛️ Malacca" to Color(0xFFE57373)
-            )
-
-            items(destinations.size) { index ->
-                val (destination, color) = destinations[index]
-                Surface(
-                    onClick = { /* TODO */ },
-                    shape = RoundedCornerShape(16.dp),
-                    color = color.copy(alpha = 0.15f),
-                    modifier = Modifier.width(120.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = destination,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun EnhancedSectionHeader(
     title: String,
-    subtitle: String = "",
-    onViewMoreClick: () -> Unit
+    subtitle: String = ""
 ) {
     Row(
         modifier = Modifier
@@ -1511,24 +1390,6 @@ fun EnhancedSectionHeader(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        }
-
-        TextButton(
-            onClick = onViewMoreClick,
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text(
-                "View All",
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Icon(
-                Icons.Default.ArrowForward,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
         }
     }
 }

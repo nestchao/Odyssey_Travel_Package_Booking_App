@@ -1,9 +1,7 @@
 package com.example.mad_assignment.ui
 
-
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.livedata.observeAsState
-
+import android.util.Log
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -13,20 +11,27 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
+import com.example.mad_assignment.R
+import com.example.mad_assignment.data.model.User
 import com.example.mad_assignment.data.model.UserType
 import com.example.mad_assignment.ui.aboutus.AboutUsScreen
 import com.example.mad_assignment.ui.aboutus.AboutUsViewModel
@@ -41,9 +46,11 @@ import com.example.mad_assignment.ui.forgetpassword.ForgotPasswordScreen
 import com.example.mad_assignment.ui.forgetpassword.ForgotPasswordViewModel
 import com.example.mad_assignment.ui.home.EnhancedBottomNavigationBar
 import com.example.mad_assignment.ui.home.HomeScreen
+import com.example.mad_assignment.ui.management.ManagementScreen
+import com.example.mad_assignment.ui.managetravelpackage.manageTravelPackageScreen
+import com.example.mad_assignment.ui.managetrip.ManageTripScreen
 import com.example.mad_assignment.ui.packagedetail.PackageDetailScreen
 import com.example.mad_assignment.ui.profile.ProfileScreen
-import com.example.mad_assignment.ui.profile.ProfileViewModel
 import com.example.mad_assignment.ui.search.SearchScreen
 import com.example.mad_assignment.ui.settings.SettingsScreen
 import com.example.mad_assignment.ui.settings.SettingsViewModel
@@ -51,6 +58,7 @@ import com.example.mad_assignment.ui.signin.SignInScreen
 import com.example.mad_assignment.ui.signin.SignInViewModel
 import com.example.mad_assignment.ui.signup.SignUpScreen
 import com.example.mad_assignment.ui.signup.SignUpViewModel
+import com.example.mad_assignment.ui.MainViewModel
 
 @Composable
 fun AppNavigation(){
@@ -75,16 +83,11 @@ fun AppNavigation(){
                         popUpTo("signin") { inclusive = true }
                     }
                 },
-                onNavigateToSignUp = {
-                    navController.navigate("signup")
-                },
-                onForgotPassword = {
-                    navController.navigate("forgot_password")
-                }
+                onNavigateToSignUp = { navController.navigate("signup") },
+                onForgotPassword = { navController.navigate("forgot_password") }
             )
         }
 
-        // Sign Up
         composable("signup") {
             val viewModel: SignUpViewModel = hiltViewModel()
             SignUpScreen(
@@ -94,30 +97,31 @@ fun AppNavigation(){
                         popUpTo("signin") { inclusive = true }
                     }
                 },
-                onNavigateToSignIn = {
-                    navController.navigate("signin")
-                }
+                onNavigateToSignIn = { navController.navigate("signin") }
             )
         }
 
-        // Forgot Password
         composable("forgot_password") {
             val viewModel: ForgotPasswordViewModel = hiltViewModel()
             ForgotPasswordScreen(
                 viewModel = viewModel,
-                onNavigateBack = {
-                    navController.navigate("signin")
-                },
-                onResetSuccess = {
-                    navController.navigate("signin")
-                }
+                onNavigateBack = { navController.navigate("signin") },
+                onResetSuccess = { navController.navigate("signin") }
             )
         }
 
-        composable("phone_main") {
+        composable("phone_main") { navBackStackEntry ->
+            val shouldRefresh by navBackStackEntry
+                .savedStateHandle
+                .getLiveData<Boolean>("profile_updated")
+                .observeAsState(false)
+
+            val mainViewModel: MainViewModel = hiltViewModel()
             PhoneContainerScreen(
+                mainViewModel = mainViewModel,
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
                 onNavigateToSearch = { navController.navigate("search") },
+                onNavigateToManagement = { navController.navigate("manage") },
                 onSignOut = { navController.navigate("signin") { popUpTo(navController.graph.startDestinationId) { inclusive = true } } },
                 onNavigateToAccountDetails = { navController.navigate("account_detail") },
                 onNavigateToSettings = { navController.navigate("setting") }
@@ -125,10 +129,17 @@ fun AppNavigation(){
         }
 
         composable("tablet_main") { navBackStackEntry ->
+            val shouldRefresh by navBackStackEntry
+                .savedStateHandle
+                .getLiveData<Boolean>("profile_updated")
+                .observeAsState(false)
 
+            val mainViewModel: MainViewModel = hiltViewModel()
             TabletContainerScreen(
+                mainViewModel = mainViewModel,
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
                 onNavigateToSearch = { navController.navigate("search") },
+                onNavigateToManagement = { navController.navigate("manage") },
                 onSignOut = { navController.navigate("signin") { popUpTo(navController.graph.startDestinationId) { inclusive = true } } },
                 onNavigateToAccountDetails = { navController.navigate("account_detail") },
                 onNavigateToSettings = { navController.navigate("setting") }
@@ -147,6 +158,30 @@ fun AppNavigation(){
                 onNavigateBack = { navController.popBackStack() },
                 onPackageClick = { packageId -> navController.navigate("detail/$packageId") }
             )
+        }
+
+        composable("manage") {
+            ManagementScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAddPackage = { navController.navigate("add_edit_package") },
+                onNavigateToEditPackage = { packageId -> navController.navigate("add_edit_package?packageId=$packageId") },
+                onNavigateToAddTrip = { navController.navigate("add_edit_trip") },
+                onNavigateToEditTrip = { tripId -> navController.navigate("add_edit_trip?tripId=$tripId") }
+            )
+        }
+
+        composable(
+            route = "add_edit_package?packageId={packageId}",
+            arguments = listOf(navArgument("packageId") { type = NavType.StringType; nullable = true })
+        ) {
+            manageTravelPackageScreen(navController = navController)
+        }
+
+        composable(
+            route = "add_edit_trip?tripId={tripId}",
+            arguments = listOf(navArgument("tripId") { type = NavType.StringType; nullable = true })
+        ) {
+            ManageTripScreen(navController = navController)
         }
 
         composable("account_detail") {
@@ -205,12 +240,20 @@ fun AppNavigation(){
 
 @Composable
 private fun PhoneContainerScreen(
+    mainViewModel: MainViewModel,
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
+    onNavigateToManagement: () -> Unit,
     onSignOut: () -> Unit,
     onNavigateToAccountDetails : () -> Unit,
     onNavigateToSettings : () -> Unit,
 ) {
+    val user by mainViewModel.currentUser.collectAsState()
+    LaunchedEffect(user) {
+        user?.let {
+            Log.d("AppNavigation", "Current User (Phone): ${it.firstName} ${it.lastName}")
+        }
+    }
     val contentNavController = rememberNavController()
     Scaffold(
         bottomBar = { EnhancedBottomNavigationBar(navController = contentNavController) }
@@ -220,14 +263,12 @@ private fun PhoneContainerScreen(
             startDestination = "home",
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable("home") {
-                HomeScreen(
-                    onPackageClick = onNavigateToDetail,
-                    onNavigateToSearch = onNavigateToSearch
-                )
-            }
-            composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
-            composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
+            sharedAppGraph(
+                onNavigateToDetail = onNavigateToDetail,
+                onNavigateToSearch = onNavigateToSearch,
+                onNavigateToManagement = onNavigateToManagement
+            )
+
             composable("profile") {
                 ProfileScreen(
                     viewModel = hiltViewModel(),
@@ -240,40 +281,47 @@ private fun PhoneContainerScreen(
     }
 }
 
-// --- MODIFIED: Container for the Tablet Layout ---
 @Composable
 private fun TabletContainerScreen(
+    mainViewModel: MainViewModel,
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
+    onNavigateToManagement: () -> Unit,
     onSignOut: () -> Unit,
     onNavigateToAccountDetails : () -> Unit,
     onNavigateToSettings : () -> Unit,
 ) {
+    val user by mainViewModel.currentUser.collectAsState()
+    LaunchedEffect(user) {
+        user?.let {
+            Log.d("AppNavigation", "Current User (Tablet): ${it.firstName} ${it.lastName}")
+        }
+    }
     val contentNavController = rememberNavController()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
     if (isLandscape) {
-        Row {
+        Row(modifier = Modifier.fillMaxSize()) {
             TabletSideNavigation(
-                modifier = Modifier.width(240.dp).fillMaxHeight(),
-                navController = contentNavController
+                modifier = Modifier.width(280.dp).fillMaxHeight(),
+                navController = contentNavController,
+                user = user
             )
             NavHost(
                 navController = contentNavController,
                 startDestination = "home",
                 modifier = Modifier.weight(1f)
             ) {
-                composable("home") {
-                    HomeScreen(
-                        onPackageClick = onNavigateToDetail,
-                        onNavigateToSearch = onNavigateToSearch
-                    )
-                }
-                composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
-                composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
+                sharedAppGraph(
+                    onNavigateToDetail = onNavigateToDetail,
+                    onNavigateToSearch = onNavigateToSearch,
+                    onNavigateToManagement = onNavigateToManagement
+                )
                 composable("favorites") { PlaceholderScreen(screenName = "Favorites") }
-                composable("settings") { PlaceholderScreen(screenName = "Settings") }
+                composable("settings") {
+                    PlaceholderScreen(screenName = "Settings")
+                }
 
                 composable("profile") {
                     ProfileScreen(
@@ -286,15 +334,32 @@ private fun TabletContainerScreen(
             }
         }
     } else {
-        // Portrait tablet uses the same layout as the phone, passing the new parameters through
         PhoneContainerScreen(
+            mainViewModel = mainViewModel,
             onNavigateToDetail = onNavigateToDetail,
             onNavigateToSearch = onNavigateToSearch,
+            onNavigateToManagement = onNavigateToManagement,
             onSignOut = onSignOut,
             onNavigateToAccountDetails = onNavigateToAccountDetails,
             onNavigateToSettings = onNavigateToSettings,
         )
     }
+}
+
+private fun NavGraphBuilder.sharedAppGraph(
+    onNavigateToDetail: (String) -> Unit,
+    onNavigateToSearch: () -> Unit,
+    onNavigateToManagement: () -> Unit
+) {
+    composable("home") {
+        HomeScreen(
+            onPackageClick = onNavigateToDetail,
+            onNavigateToSearch = onNavigateToSearch,
+            onNavigateToManagement = onNavigateToManagement
+        )
+    }
+    composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
+    composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
 }
 
 
@@ -305,11 +370,11 @@ private data class SideNavItem(
     val filledIcon: ImageVector
 )
 
-// --- Navigation Rail for Tablet ---
 @Composable
 private fun TabletSideNavigation(
     modifier: Modifier = Modifier,
-    navController: NavController
+    navController: NavController,
+    user: User?
 ) {
     val items = listOf(
         SideNavItem("Home", "home", Icons.Outlined.Home, Icons.Filled.Home),
@@ -334,9 +399,7 @@ private fun TabletSideNavigation(
                 .padding(16.dp)
         ) {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                 ),
@@ -346,11 +409,10 @@ private fun TabletSideNavigation(
                     modifier = Modifier.padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        Icons.Default.TravelExplore,
+                    Image(
+                        painter = painterResource(id = R.drawable.odyssey_logo),
                         contentDescription = null,
-                        modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        modifier = Modifier.size(40.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -388,9 +450,7 @@ private fun TabletSideNavigation(
                             Color.Transparent
                     ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
@@ -447,13 +507,13 @@ private fun TabletSideNavigation(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            "John Doe",
+                            text = if (user != null) "${user.firstName} ${user.lastName}" else "Loading...",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            "Traveler",
+                            text = user?.userType?.name?.replaceFirstChar { it.uppercase() } ?: "Traveler",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -464,7 +524,6 @@ private fun TabletSideNavigation(
     }
 }
 
-// --- Placeholder Screen ---
 @Composable
 fun PlaceholderScreen(screenName: String) {
     Box(
