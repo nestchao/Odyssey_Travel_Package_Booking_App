@@ -1,5 +1,3 @@
-// In file: /ui/AppNavigation.kt
-
 package com.example.mad_assignment.ui
 
 import androidx.compose.foundation.layout.*
@@ -21,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
@@ -29,6 +28,9 @@ import com.example.mad_assignment.ui.home.EnhancedBottomNavigationBar
 import com.example.mad_assignment.ui.home.HomeScreen
 import com.example.mad_assignment.ui.packagedetail.PackageDetailScreen
 import com.example.mad_assignment.ui.search.SearchScreen
+import com.example.mad_assignment.ui.management.ManagementScreen
+import com.example.mad_assignment.ui.managetravelpackage.manageTravelPackageScreen
+import com.example.mad_assignment.ui.managetrip.ManageTripScreen
 
 @Composable
 fun AppNavigation(){
@@ -42,35 +44,76 @@ fun AppNavigation(){
         composable("phone_main") {
             PhoneContainerScreen(
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
-                onNavigateToSearch = { navController.navigate("search") }
+                onNavigateToSearch = { navController.navigate("search") },
+                onNavigateToManagement = { navController.navigate("manage") }
             )
         }
         composable("tablet_main") {
             TabletContainerScreen(
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
-                onNavigateToSearch = { navController.navigate("search") }
+                onNavigateToSearch = { navController.navigate("search") },
+                onNavigateToManagement = { navController.navigate("manage") }
             )
         }
+
         composable(
             route = "detail/{packageId}",
             arguments = listOf(navArgument("packageId") { type = NavType.StringType })
         ){
             PackageDetailScreen(onNavigateBack = { navController.popBackStack() })
         }
+
         composable(route = "search"){
             SearchScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onPackageClick = { packageId -> navController.navigate("detail/$packageId") }
             )
         }
+
+        composable(
+            route = "add_edit_package?packageId={packageId}",
+            arguments = listOf(
+                navArgument("packageId") {
+                    type = NavType.StringType
+                    nullable = true
+                }
+            )
+        ) {
+            manageTravelPackageScreen(navController = navController)
+        }
+
+        // --- MODIFIED: Define the route for adding/editing a trip ---
+        composable(
+            route = "add_edit_trip?tripId={tripId}", // The route now accepts an optional tripId
+            arguments = listOf(
+                navArgument("tripId") {
+                    type = NavType.StringType
+                    nullable = true // Nullable, so we can use the same route for adding new trips
+                }
+            )
+        ) {
+            ManageTripScreen(navController = navController)
+        }
+
+        composable("manage") {
+            ManagementScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAddPackage = { navController.navigate("add_edit_package") },
+                onNavigateToEditPackage = { packageId -> navController.navigate("add_edit_package?packageId=$packageId") },
+
+                // --- MODIFIED: Connect the navigation callbacks for trips ---
+                onNavigateToAddTrip = { navController.navigate("add_edit_trip") },
+                onNavigateToEditTrip = { tripId -> navController.navigate("add_edit_trip?tripId=$tripId") }
+            )
+        }
     }
 }
 
-// --- Container for the Phone Layout ---
 @Composable
 private fun PhoneContainerScreen(
     onNavigateToDetail: (String) -> Unit,
-    onNavigateToSearch: () -> Unit
+    onNavigateToSearch: () -> Unit,
+    onNavigateToManagement: () -> Unit
 ) {
     val contentNavController = rememberNavController()
     Scaffold(
@@ -81,33 +124,29 @@ private fun PhoneContainerScreen(
             startDestination = "home",
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable("home") {
-                HomeScreen(
-                    onPackageClick = onNavigateToDetail,
-                    onNavigateToSearch = onNavigateToSearch
-                )
-            }
-            composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
-            composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
-            composable("profile") { PlaceholderScreen(screenName = "Profile") }
+            sharedAppGraph(
+                onNavigateToDetail = onNavigateToDetail,
+                onNavigateToSearch = onNavigateToSearch,
+                onNavigateToManagement = onNavigateToManagement
+            )
         }
     }
 }
 
-// --- Container for the Tablet Layout ---
 @Composable
 private fun TabletContainerScreen(
     onNavigateToDetail: (String) -> Unit,
-    onNavigateToSearch: () -> Unit
+    onNavigateToSearch: () -> Unit,
+    onNavigateToManagement: () -> Unit
 ) {
     val contentNavController = rememberNavController()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
     if (isLandscape) {
-        Row {
-            TabletSideNavigation( // This function now lives below in this same file
-                modifier = Modifier.width(240.dp).fillMaxHeight(),
+        Row(modifier = Modifier.fillMaxSize()) {
+            TabletSideNavigation(
+                modifier = Modifier.width(280.dp).fillMaxHeight(),
                 navController = contentNavController
             )
             NavHost(
@@ -115,16 +154,12 @@ private fun TabletContainerScreen(
                 startDestination = "home",
                 modifier = Modifier.weight(1f)
             ) {
-                composable("home") {
-                    HomeScreen(
-                        onPackageClick = onNavigateToDetail,
-                        onNavigateToSearch = onNavigateToSearch
-                    )
-                }
-                composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
-                composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
+                sharedAppGraph(
+                    onNavigateToDetail = onNavigateToDetail,
+                    onNavigateToSearch = onNavigateToSearch,
+                    onNavigateToManagement = onNavigateToManagement
+                )
                 composable("favorites") { PlaceholderScreen(screenName = "Favorites") }
-                composable("profile") { PlaceholderScreen(screenName = "Profile") }
                 composable("settings") { PlaceholderScreen(screenName = "Settings") }
             }
         }
@@ -137,21 +172,16 @@ private fun TabletContainerScreen(
                 startDestination = "home",
                 modifier = Modifier.padding(innerPadding)
             ) {
-                composable("home") {
-                    HomeScreen(
-                        onPackageClick = onNavigateToDetail,
-                        onNavigateToSearch = onNavigateToSearch
-                    )
-                }
-                composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
-                composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
-                composable("profile") { PlaceholderScreen(screenName = "Profile") }
+                sharedAppGraph(
+                    onNavigateToDetail = onNavigateToDetail,
+                    onNavigateToSearch = onNavigateToSearch,
+                    onNavigateToManagement = onNavigateToManagement
+                )
             }
         }
     }
 }
 
-// --- Helper Data Class for Side Navigation ---
 private data class SideNavItem(
     val label: String,
     val route: String,
@@ -159,7 +189,6 @@ private data class SideNavItem(
     val filledIcon: ImageVector
 )
 
-// --- Navigation Rail for Tablet ---
 @Composable
 private fun TabletSideNavigation(
     modifier: Modifier = Modifier,
@@ -314,7 +343,6 @@ private fun TabletSideNavigation(
     }
 }
 
-// --- Placeholder Screen ---
 @Composable
 fun PlaceholderScreen(screenName: String) {
     Box(
@@ -323,4 +351,21 @@ fun PlaceholderScreen(screenName: String) {
     ) {
         Text(text = "$screenName Screen", style = MaterialTheme.typography.headlineMedium)
     }
+}
+
+private fun NavGraphBuilder.sharedAppGraph(
+    onNavigateToDetail: (String) -> Unit,
+    onNavigateToSearch: () -> Unit,
+    onNavigateToManagement: () -> Unit
+) {
+    composable("home") {
+        HomeScreen(
+            onPackageClick = onNavigateToDetail,
+            onNavigateToSearch = onNavigateToSearch,
+            onNavigateToManagement = onNavigateToManagement
+        )
+    }
+    composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
+    composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
+    composable("profile") { PlaceholderScreen(screenName = "Profile") }
 }

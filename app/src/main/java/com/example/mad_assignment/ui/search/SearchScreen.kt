@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -34,7 +35,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.mad_assignment.ui.home.EnhancedPackageCard
 import com.example.mad_assignment.ui.home.HomeUiState
-import com.example.mad_assignment.ui.home.TravelPackageWithImages
 
 @Composable
 fun SearchScreen(
@@ -281,7 +281,7 @@ private fun SearchEmptyState(
     onPackageClick: (String) -> Unit
 ) {
     // NEW: Manage the selected tab state here
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
     val tabs = listOf("Wishlist", "Nearby", "New")
 
     LazyColumn(
