@@ -5,20 +5,25 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mad_assignment.data.model.DepartureAndEndTime
+import com.example.mad_assignment.data.repository.PaymentRepository
 import com.example.mad_assignment.data.repository.TravelPackageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class PackageDetailViewModel @Inject constructor(
     private val packageRepository: TravelPackageRepository,
+    private val paymentRepository: PaymentRepository,
     // TODO: import cart repository here
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
