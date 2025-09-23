@@ -104,6 +104,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.mad_assignment.data.datasource.NotificationsDataSource
 import com.example.mad_assignment.data.datasource.ScheduledNotificationDataSource
+import com.example.mad_assignment.data.model.TravelPackageWithImages
 import com.example.mad_assignment.data.repository.NotificationRepository
 import com.example.mad_assignment.ui.notifications.NotificationsViewModel
 import com.example.mad_assignment.ui.notifications.NotificationsViewModelFactory

@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,18 +32,32 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.mad_assignment.data.model.DepartureAndEndTime
 import com.example.mad_assignment.data.model.TravelPackage
+import com.example.mad_assignment.data.model.TravelPackageWithImages
 import com.example.mad_assignment.data.model.Trip
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.Locale
-import com.example.mad_assignment.ui.packagedetail.PackageDetailData
 import com.example.mad_assignment.util.toDataUri
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.graphics.Bitmap
+import android.net.Uri
+import android.util.Log
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.Toast
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.alpha
+
 @Composable
 fun PackageDetailScreen(onNavigateBack: () -> Unit) {
     val viewModel: PackageDetailViewModel = hiltViewModel()
@@ -122,7 +135,7 @@ fun PackageDetailScreen(onNavigateBack: () -> Unit) {
                             )
                         }
                         item {
-                            EnhancedLocationSection()
+                            EnhancedLocationSection(itineraryTrips = state.itineraryTrips)
                         }
                         item {
                             Spacer(modifier = Modifier.height(24.dp))
@@ -235,7 +248,7 @@ fun EnhancedDateSelector(
             ) {
                 items(items = departures, key = { it.id }) { departure ->
                     val isSelected = departure.id == selectedDeparture?.id
-                    val spotsLeft = departure.capacity // NOTE: This assumes capacity is spots left. You might need a more complex calculation.
+                    val spotsLeft = departure.capacity
                     val isSoldOut = spotsLeft <= 0
 
                     val backgroundColor by animateColorAsState(
@@ -336,7 +349,7 @@ fun EnhancedDescriptionSection(description: String) {
 @Composable
 fun EnhancedPackageInfoBar(
     travelPackage: TravelPackage,
-    itineraryTrips: Map<Int, List<Trip>> // Use itineraryTrips to match the state
+    itineraryTrips: Map<Int, List<Trip>>
 ) {
     Card(
         modifier = Modifier
@@ -409,21 +422,52 @@ fun RowScope.EnhancedInfoColumn(
 }
 
 @Composable
-fun EnhancedLocationSection() {
+fun EnhancedLocationSection(itineraryTrips: Map<Int, List<Trip>>) {
+    // --- DYNAMIC LOGIC: Find the very first trip of the whole itinerary ---
+    // We use remember to avoid recalculating this on every recomposition.
+    val previewTrip = remember(itineraryTrips) {
+        if (itineraryTrips.isEmpty()) {
+            null
+        } else {
+            // Find the earliest day (e.g., Day 1)
+            val earliestDay = itineraryTrips.keys.minOrNull()
+            // Get the first trip from that earliest day's list
+            earliestDay?.let { day -> itineraryTrips[day]?.firstOrNull { it.geoPoint != null } }
+        }
+    }
+
+    val mapHtml = if (previewTrip != null && previewTrip.geoPoint != null) {
+        val lat = previewTrip.geoPoint.latitude
+        val lon = previewTrip.geoPoint.longitude
+
+        """
+        <iframe
+          src="https://maps.google.com/maps?q=@$lat,$lon&z=15&output=embed"
+          width="370"
+          height="300"
+          style="border:0;"
+          allowfullscreen
+          loading="lazy">
+        </iframe>
+        """.trimIndent()
+    } else {
+        ""
+    }
+
+    val context = LocalContext.current
+
     Column(modifier = Modifier.padding(vertical = 16.dp)) {
         Row(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                Icons.Outlined.Map,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
+                Icons.Outlined.Map, contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Location & Map",
+                text = "Route & Locations",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -433,35 +477,86 @@ fun EnhancedLocationSection() {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 20.dp),
+            shape = RoundedCornerShape(16.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.2f)
+            // Check if we found a valid trip with a location to show
+            if (previewTrip != null && previewTrip.geoPoint != null) {
+                Box {
+                    AndroidView(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp)
+                            .clip(RoundedCornerShape(16.dp)),
+                        factory = {
+                            WebView(it).apply {
+                                settings.javaScriptEnabled = true
+                                webViewClient = WebViewClient()
+                                loadDataWithBaseURL(null, mapHtml, "text/html", "UTF-8", null)
+                            }
+                        },
+                        update = {
+                            it.loadDataWithBaseURL(null, mapHtml, "text/html", "UTF-8", null)
+                        }
+                    )
+
+                    ExtendedFloatingActionButton(
+                        onClick = {
+                            val allTripsSorted = itineraryTrips.keys.sorted()
+                                .flatMap { day -> itineraryTrips[day].orEmpty() }
+                                .filter { it.geoPoint != null }
+
+                            if (allTripsSorted.isEmpty()) {
+                                Toast.makeText(context, "No locations available for this route.", Toast.LENGTH_SHORT).show()
+                                return@ExtendedFloatingActionButton
+                            }
+
+                            val origin = allTripsSorted.first()
+                            val finalDestination = allTripsSorted.last()
+
+                            // Waypoints are the locations in between the start and end
+                            val waypoints = if (allTripsSorted.size > 2) {
+                                allTripsSorted.subList(1, allTripsSorted.size - 1)
+                            } else {
+                                emptyList()
+                            }
+
+                            // Build the waypoints string: lat,lng|lat,lng|...
+                            val waypointsString = waypoints.joinToString("|") {
+                                "${it.geoPoint!!.latitude},${it.geoPoint.longitude}"
+                            }
+
+                            // Build the full directions URL
+                            val intentUri = Uri.parse(
+                                "https://www.google.com/maps/dir/?api=1" +
+                                        "&origin=${origin.geoPoint!!.latitude},${origin.geoPoint.longitude}" +
+                                        "&destination=${finalDestination.geoPoint!!.latitude},${finalDestination.geoPoint.longitude}" +
+                                        "&waypoints=$waypointsString"
                             )
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Outlined.Map,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+
+                            val mapIntent = Intent(Intent.ACTION_VIEW, intentUri)
+                            mapIntent.setPackage("com.google.android.apps.maps")
+
+                            try {
+                                context.startActivity(mapIntent)
+                            } catch (e: ActivityNotFoundException) {
+                                Toast.makeText(context, "Google Maps app not installed.", Toast.LENGTH_LONG).show()
+                            }
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(16.dp),
+                        text = { Text("Open Route") },
+                        icon = { Icon(Icons.Outlined.Directions, contentDescription = "Directions") }
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Interactive map coming soon",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                }
+            } else {
+                // Fallback view if there are no trips with locations in the itinerary
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(200.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No locations available.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -471,7 +566,7 @@ fun EnhancedLocationSection() {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EnhancedImageHeader(
-    packageDetail: PackageDetailData,
+    packageDetail: TravelPackageWithImages,
     onNavigateBack: () -> Unit
 ) {
     val images = packageDetail.images
@@ -537,30 +632,9 @@ fun EnhancedImageHeader(
                 }
             }
 
-            val viewModel: PackageDetailViewModel = hiltViewModel()
-            val isInWishlist by viewModel.isInWishlist.collectAsStateWithLifecycle()
-
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(onClick = { /* TODO: Share */ }, shape = CircleShape, color = Color.Black.copy(alpha = 0.4f), modifier = Modifier.size(48.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(24.dp)) }
-                }
-
-                Surface(
-                    onClick = {
-                        viewModel.toggleFavButton()
-                    },
-                    shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.4f),
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = if (isInWishlist) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                            contentDescription = "Favorite",
-                            tint = if (isInWishlist) Color.Red else Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                Surface(onClick = { /* TODO: Wishlist */ }, shape = CircleShape, color = Color.Black.copy(alpha = 0.4f), modifier = Modifier.size(48.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.FavoriteBorder, contentDescription = "Favorite", tint = Color.White, modifier = Modifier.size(24.dp)) }
                 }
             }
         }
