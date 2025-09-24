@@ -46,6 +46,8 @@ import com.example.mad_assignment.ui.home.HomeScreen
 import com.example.mad_assignment.ui.management.ManagementScreen
 import com.example.mad_assignment.ui.managetravelpackage.manageTravelPackageScreen
 import com.example.mad_assignment.ui.managetrip.ManageTripScreen
+import com.example.mad_assignment.ui.manageuser.ManageUserScreen
+import com.example.mad_assignment.ui.manageuser.ManageUserViewModel
 import com.example.mad_assignment.ui.notifications.NotificationDetailsScreen
 import com.example.mad_assignment.ui.notifications.NotificationSchedulerScreen
 import com.example.mad_assignment.ui.notifications.NotificationsScreen
@@ -266,7 +268,7 @@ fun AppNavigation(){
             val viewModel: AdminDashboardViewModel = hiltViewModel()
             AdminDashboardScreen(
                 viewModel = viewModel,
-                onNavigateToUsers = { navController.navigate("admin_users") },
+                onNavigateToUsers = { navController.navigate("manage_user") },
                 onNavigateToBookings = { navController.navigate("admin_bookings") },
                 onNavigateToAnalytics = { navController.navigate("admin_analytics") },
                 onNavigateToSettings = { navController.navigate("admin_settings") },
@@ -275,6 +277,14 @@ fun AppNavigation(){
                         popUpTo("admin_dashboard") { inclusive = true }
                     }
                 }
+            )
+        }
+
+        composable("manage_user") {
+            val viewModel: ManageUserViewModel = hiltViewModel()
+            ManageUserScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
     }

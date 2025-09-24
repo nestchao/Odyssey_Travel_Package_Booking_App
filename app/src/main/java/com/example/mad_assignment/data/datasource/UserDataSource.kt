@@ -139,4 +139,15 @@ class UserDataSource @Inject constructor(
         }
     }
 
+    suspend fun updateUserType(userId: String, newType: UserType) {
+        try {
+            val userDocumentRef = firestore.collection("users").document(userId)
+
+            userDocumentRef.update("userType", newType).await()
+
+        } catch (e: Exception) {
+            throw e
+        }
+    }
+
 }
