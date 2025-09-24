@@ -8,6 +8,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
 
+fun base64ToDataUri(base64String: String?): String? {
+    if (base64String.isNullOrBlank()) {
+        return null
+    }
+    // This regex correctly handles if the prefix is already there.
+    val dataUriRegex = Regex("^data:image/[^;]+;base64,")
+    if (base64String.startsWith("data:image")) {
+        return base64String // It's already in the correct format
+    }
+    return "data:image/jpeg;base64,$base64String"
+}
+
 fun toDataUri(base64Data: String?): ByteArray? {
     if (base64Data.isNullOrEmpty()) {
         return null

@@ -94,6 +94,9 @@ dependencies {
 
     implementation("io.coil-kt:coil-compose:2.6.0")
 
+    // Gson
+    implementation("com.google.code.gson:gson:2.10.1")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

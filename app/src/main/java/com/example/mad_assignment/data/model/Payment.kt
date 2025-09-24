@@ -6,12 +6,12 @@ import com.google.firebase.firestore.ServerTimestamp
 
 data class Payment (
     @DocumentId
-    val id: String = "",
+    val paymentId: String = "",
     val userId: String = "",
-    val associatedPackageId: String = "",
+    val bookingIds: List<String> = emptyList(),
     val amount: Double = 0.0,
+    val paymentMethod: String = "",
     val status: PaymentStatus = PaymentStatus.PENDING,
-    val paymentMethod: String? = null,
     val gatewayTransactionId: String? = null,
     @ServerTimestamp
     val createdAt: Timestamp? = null,
@@ -20,7 +20,7 @@ data class Payment (
 
 enum class PaymentStatus {
     PENDING,
-    PAID,
+    SUCCESS,
     FAILED,
     REFUNDED
 }

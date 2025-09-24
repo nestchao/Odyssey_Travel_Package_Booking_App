@@ -30,35 +30,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, true)
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         setContent {
             MAD_ASSIGNMENTTheme {
                 Box(modifier = Modifier.fillMaxSize()) {
                     AppNavigation()
-//                    val scope = rememberCoroutineScope()
-//                    val firestore = Firebase.firestore
-//
-//                    Column(
-//                        modifier = Modifier
-//                            .align(Alignment.TopEnd)
-//                            .padding(top = 80.dp, end = 16.dp),
-//                        horizontalAlignment = Alignment.CenterHorizontally
-//                    ) {
-//                        Button(
-//                            onClick = {
-//                                scope.launch {
-//                                    try {
-//                                        Log.d("MainActivity", "Seed Database button clicked.")
-//                                        DataUploader.seedDatabase(firestore)
-//                                        Log.d("MainActivity", "Seeding process finished.")
-//                                    } catch (e: Exception) {
-//                                        Log.e("MainActivity", "Error during seeding", e)
-//                                    }
-//                                }
-//                            }
-//                        ) {
-//                            Text("Seed Database")
-//                        }
-//                    }
                 }
             }
         }
