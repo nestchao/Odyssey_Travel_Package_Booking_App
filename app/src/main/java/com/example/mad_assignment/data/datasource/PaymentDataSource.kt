@@ -1,78 +1,91 @@
 package com.example.mad_assignment.data.datasource
 
+import android.util.Log
 import com.example.mad_assignment.data.model.Payment
 import com.example.mad_assignment.data.model.PaymentStatus
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
-import java.util.Random
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.random.Random
 
 @Singleton
 class PaymentDataSource @Inject constructor(
     private val firestore: FirebaseFirestore
 ) {
     companion object {
-        const val PAYMENTS_COLLECTION = "payments"
+        private const val PAYMENTS_COLLECTION = "payments"
+        private const val TAG = "PaymentDataSource"
     }
 
-    /**
-     * Creates a new payment document in Firestore with a PENDING status.
-     * Returns the ID of the newly created payment document.
-     */
     suspend fun createPayment(payment: Payment): Result<String> {
         return try {
-            val docRef = firestore.collection(PAYMENTS_COLLECTION).document()
-            val finalPayment = payment.copy(id = docRef.id)
-            docRef.set(finalPayment).await()
-            Result.success(docRef.id)
+            val paymentWithTimestamp = payment.copy(
+                createdAt = Timestamp.now(),
+                updatedAt = Timestamp.now()
+            )
+            val documentRef = firestore.collection(PAYMENTS_COLLECTION).add(paymentWithTimestamp).await()
+            Result.success(documentRef.id)
         } catch (e: Exception) {
-            Result.failure(e)
+            Log.e(TAG, "createPayment failed", e)
+            Result.failure(RuntimeException("Failed to create new payment record", e))
         }
     }
 
-    /**
-     * Updates the status of an existing payment.
-     */
-    suspend fun updatePaymentStatus(paymentId: String, newStatus: PaymentStatus, gatewayTransactionId: String? = null): Result<Unit> {
+    suspend fun updatePaymentStatus(
+        paymentId: String,
+        newStatus: PaymentStatus,
+        bookingIds: List<String>? = null,
+        gatewayTransactionId: String? = null
+    ): Result<Unit> {
         return try {
+            val paymentRef = firestore.collection(PAYMENTS_COLLECTION).document(paymentId)
             val updates = mutableMapOf<String, Any>(
                 "status" to newStatus.name,
                 "updatedAt" to Timestamp.now()
             )
             gatewayTransactionId?.let { updates["gatewayTransactionId"] = it }
+            bookingIds?.let { updates["bookingIds"] = it }
 
-            firestore.collection(PAYMENTS_COLLECTION)
-                .document(paymentId)
-                .update(updates)
-                .await()
+            paymentRef.update(updates).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Log.e(TAG, "updatePaymentStatus failed for paymentId: $paymentId", e)
+            Result.failure(RuntimeException("Failed to update payment status", e))
         }
     }
 
     /**
-     * (Simulated) Processes an external payment. In a real app, this would involve
-     * calling a payment gateway SDK/API. For now, it just simulates success or failure.
+     * This is a placeholder for a real payment gateway integration (e.g., Stripe, PayPal).
+     * It simulates a network call and a success/failure response.
      */
-    suspend fun simulateExternalPayment(paymentId: String, amount: Double, paymentMethod: String): Result<String> {
-        // Simulate network delay
-        delay(2000)
+    suspend fun simulateExternalPayment(
+        paymentId: String,
+        amount: Double,
+        paymentMethod: String
+    ): Result<String> {
+        return try {
+            Log.d(TAG, "Simulating payment for paymentId: $paymentId, amount: $amount")
+            // Simulate network delay
+            delay(2000)
 
-        // Simulate a random success/failure
-        val random = Random()
-        val success = random.nextBoolean() // 50% chance of success
+            // Simulate a success/failure scenario
+            val isSuccess = true// 50% chance of success for simulation
 
-        if (success) {
-            val gatewayId = "TXN-${System.currentTimeMillis()}-${random.nextInt(1000)}"
-            updatePaymentStatus(paymentId, PaymentStatus.PAID, gatewayId).getOrThrow()
-            return Result.success(gatewayId)
-        } else {
-            updatePaymentStatus(paymentId, PaymentStatus.FAILED).getOrThrow()
-            return Result.failure(Exception("Payment failed. Please try again."))
+            if (isSuccess) {
+                val transactionId = "sim_${UUID.randomUUID()}"
+                Log.d(TAG, "Payment simulation successful. Transaction ID: $transactionId")
+                Result.success(transactionId)
+            } else {
+                Log.w(TAG, "Payment simulation failed.")
+                Result.failure(Exception("Payment declined by gateway."))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "simulateExternalPayment encountered an error", e)
+            Result.failure(e)
         }
     }
 }

@@ -5,11 +5,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.mad_assignment.data.model.CartItem
 import com.example.mad_assignment.data.model.DepartureAndEndTime
+import com.example.mad_assignment.data.repository.CartRepository
 import com.example.mad_assignment.data.repository.PaymentRepository
 import com.example.mad_assignment.data.repository.TravelPackageRepository
 import com.example.mad_assignment.data.repository.RecentlyViewedRepository
 import com.example.mad_assignment.data.repository.WishlistRepository
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
@@ -28,7 +31,7 @@ import javax.inject.Inject
 class PackageDetailViewModel @Inject constructor(
     private val packageRepository: TravelPackageRepository,
     private val paymentRepository: PaymentRepository,
-    // TODO: import cart repository here
+    private val cartRepository: CartRepository,
     private val wishlistRepository: WishlistRepository,
     private val recentlyViewedRepository: RecentlyViewedRepository,
     private val auth: FirebaseAuth,
@@ -137,6 +140,73 @@ class PackageDetailViewModel @Inject constructor(
                 currentState.copy(paxCounts = currentPaxCounts)
             } else {
                 currentState
+            }
+        }
+    }
+
+    fun addToCart() {
+        viewModelScope.launch {
+            val currentState = _uiState.value
+            if (currentState !is PackageDetailUiState.Success) {
+                Log.e("AddToCart", "UI state is not Success, cannot add to cart.")
+                return@launch
+            }
+
+            // Safety checks
+            val userId = getCurrentUserId()
+            if (userId == null) {
+                Log.e("AddToCart", "User is not logged in.")
+                // Here you might want to emit an event to the UI to show a login prompt
+                return@launch
+            }
+            if (packageId == null) {
+                Log.e("AddToCart", "Package ID is null.")
+                return@launch
+            }
+            val selectedDeparture = currentState.selectedDeparture
+            if (selectedDeparture == null) {
+                Log.e("AddToCart", "No departure date selected.")
+                return@launch
+            }
+            val totalTravelers = currentState.paxCounts.values.sum()
+            if (totalTravelers == 0) {
+                Log.e("AddToCart", "No travelers selected.")
+                return@launch
+            }
+
+            // Create the CartItem object
+            val cartItem = CartItem(
+                packageId = packageId,
+                departureId = selectedDeparture.id,
+                basePrice = currentState.totalPrice, // Base price is the calculated total for this booking
+                totalPrice = currentState.totalPrice,
+                noOfAdults = currentState.paxCounts["Adult"] ?: 0,
+                noOfChildren = currentState.paxCounts["Child"] ?: 0,
+                totalTravelerCount = totalTravelers,
+                startDate = selectedDeparture.startDate,
+                endDate = selectedDeparture.endDate,
+                durationDays = currentState.packageDetail.travelPackage.durationDays,
+                addedAt = Timestamp.now(),
+                updatedAt = Timestamp.now(),
+                // Set an expiry time, e.g., 7 days from now
+                expiresAt = Timestamp(System.currentTimeMillis() / 1000 + 86400 * 7, 0),
+                available = true
+            )
+
+            try {
+                // Get the user's existing cart or null if it doesn't exist
+                val userCart = cartRepository.getCartByUserId(userId).getOrNull()
+
+                // Add item to cart (this will create a new cart if one doesn't exist)
+                val result = cartRepository.addItemToCart(userId, userCart?.cartId, cartItem)
+                if (result.isSuccess) {
+                    Log.d("AddToCart", "Successfully added item to cart. New item ID: ${result.getOrNull()}")
+                    // Optionally, you can emit a success event to the UI here
+                } else {
+                    Log.e("AddToCart", "Failed to add item to cart", result.exceptionOrNull())
+                }
+            } catch (e: Exception) {
+                Log.e("AddToCart", "An exception occurred while adding to cart", e)
             }
         }
     }
