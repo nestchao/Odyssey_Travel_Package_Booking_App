@@ -4,6 +4,7 @@ import android.util.Log
 import com.example.mad_assignment.data.model.Booking
 import com.example.mad_assignment.data.model.BookingStatus
 import com.example.mad_assignment.data.model.CartItem
+import com.example.mad_assignment.data.model.TravelPackage
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.Timestamp
@@ -19,7 +20,7 @@ class BookingDataSource @Inject constructor(
         private const val BOOKINGS_COLLECTION = "bookings"
         private const val CARTS_COLLECTION = "carts"
         private const val CART_ITEMS_COLLECTION = "cartItems"
-        private const val DEPARTURE_DATES_COLLECTION = "departureDates"
+        private const val PACKAGES_COLLECTION = "packages"
         private const val TAG = "BookingDataSource"
     }
 
@@ -42,18 +43,34 @@ class BookingDataSource @Inject constructor(
             firestore.runTransaction { transaction ->
                 val bookingIds = mutableListOf<String>()
 
-                // create booking for each cart item in cart
                 for (cartItem in cartItems) {
-                    val departureDateRef = firestore.collection(DEPARTURE_DATES_COLLECTION).document(cartItem.departureDate?.id ?: "")
-                    val departureDateSnapshot = transaction.get(departureDateRef)
-                    val capacity = departureDateSnapshot.getLong("capacity") ?: 0
-                    val currentCapacity = 0 // TODO: get current booked capacity for this package
+                    val packageRef = firestore.collection(PACKAGES_COLLECTION).document(cartItem.packageId)
+                    val packageDoc = transaction.get(packageRef)
 
-                    if (currentCapacity + cartItem.totalTravelerCount > capacity) {
-                        throw FirebaseFirestoreException("Package is at full capacity.", FirebaseFirestoreException.Code.ABORTED)
+                    if (!packageDoc.exists()) {
+                        throw FirebaseFirestoreException("Package not found.", FirebaseFirestoreException.Code.NOT_FOUND)
                     }
 
-                    // create booking document
+                    val travelPackage = packageDoc.toObject(TravelPackage::class.java)
+                        ?: throw FirebaseFirestoreException("Invalid package data.", FirebaseFirestoreException.Code.DATA_LOSS)
+
+                    val departureOption = travelPackage.packageOption.find {
+                        it.startDate == cartItem.startDate && it.endDate == cartItem.endDate
+                    } ?: throw FirebaseFirestoreException("Departure option not found for the selected dates.", FirebaseFirestoreException.Code.NOT_FOUND)
+
+                    // check capacity
+                    val availableCapacity = departureOption.capacity - departureOption.bookedCount
+                    if (availableCapacity < cartItem.totalTravelerCount) {
+                        throw FirebaseFirestoreException(
+                            "Insufficient capacity. Available: $availableCapacity, Requested: ${cartItem.totalTravelerCount}",
+                            FirebaseFirestoreException.Code.ABORTED
+                        )
+                    }
+                }
+
+                // create bookings and update capacity
+                for (cartItem in cartItems) {
+                    // Create booking document
                     val newBookingRef = firestore.collection(BOOKINGS_COLLECTION).document()
                     val newBooking = Booking(
                         bookingId = newBookingRef.id,
@@ -64,18 +81,32 @@ class BookingDataSource @Inject constructor(
                         totalTravelerCount = cartItem.totalTravelerCount,
                         subtotal = cartItem.basePrice,
                         totalAmount = cartItem.totalPrice,
-                        departureDate = cartItem.departureDate,
-                        startBookingDate = cartItem.departureDate?.startDate, // change when package start timestamp is available,
-                        endBookingDate = cartItem.departureDate?.startDate, // change when package end timestamp is available
+                        startBookingDate = cartItem.startDate,
+                        endBookingDate = cartItem.endDate,
                         createdAt = Timestamp.now(),
                         updatedAt = Timestamp.now(),
                         status = BookingStatus.CONFIRMED
                     )
                     transaction.set(newBookingRef, newBooking)
                     bookingIds.add(newBookingRef.id)
+
+                    // Update the package option's booked count
+                    val packageRef = firestore.collection(PACKAGES_COLLECTION).document(cartItem.packageId)
+                    val packageDoc = transaction.get(packageRef)
+                    val travelPackage = packageDoc.toObject(TravelPackage::class.java)!!
+
+                    val updatedPackageOptions = travelPackage.packageOption.map { option ->
+                        if (option.startDate == cartItem.startDate && option.endDate == cartItem.endDate) {
+                            option.copy(bookedCount = option.bookedCount + cartItem.totalTravelerCount)
+                        } else {
+                            option
+                        }
+                    }
+
+                    transaction.update(packageRef, "packageOption", updatedPackageOptions)
                 }
 
-                // clear cart items
+                // Clear cart
                 val cartRef = firestore.collection(CARTS_COLLECTION).document(cartId)
                 transaction.update(
                     cartRef,
@@ -86,7 +117,7 @@ class BookingDataSource @Inject constructor(
                     "isValid", false
                 )
 
-                // delete cart items
+                // Delete cart items
                 for (cartItem in cartItems) {
                     val cartItemRef = firestore.collection(CART_ITEMS_COLLECTION).document(cartItem.cartItemId)
                     transaction.delete(cartItemRef)
