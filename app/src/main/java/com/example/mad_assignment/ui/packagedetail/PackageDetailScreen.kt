@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,19 +47,19 @@ import java.util.Locale
 import com.example.mad_assignment.util.toDataUri
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.graphics.Bitmap
 import android.net.Uri
-import android.util.Log
-import android.webkit.WebResourceError
-import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.compose.runtime.remember
-import androidx.compose.ui.draw.alpha
+import com.google.gson.Gson
 
 @Composable
-fun PackageDetailScreen(onNavigateBack: () -> Unit) {
+fun PackageDetailScreen(
+    onNavigateBack: () -> Unit,
+    onNavigateToCart: () -> Unit,
+    onNavigateToCheckout: (packageId: String, departureId: String, paxCountsJson: String) -> Unit,
+    ) {
     val viewModel: PackageDetailViewModel = hiltViewModel()
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -145,7 +144,21 @@ fun PackageDetailScreen(onNavigateBack: () -> Unit) {
 
                     EnhancedBookingActionBar(
                         state = state,
-                        // TODO: pass the viewModel function (viewModel.addToCart()) here
+                        onAddToCartClick = { viewModel.addToCart() },
+                        // ADD THE onBookNowClick HANDLER
+                        onBookNowClick = {
+                            // Ensure all required data is available before navigating
+                            val packageId = state.packageDetail.travelPackage.packageId
+                            val departureId = state.selectedDeparture?.id
+                            val paxCounts = state.paxCounts
+
+                            if (departureId != null && packageId.isNotBlank()) {
+                                // Serialize the map to a JSON string to pass as a nav argument
+                                // Your old code used a custom format, JSON is more robust.
+                                val paxCountsJson = Gson().toJson(paxCounts)
+                                onNavigateToCheckout(packageId, departureId, paxCountsJson)
+                            }
+                        },
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding()
@@ -637,10 +650,6 @@ fun EnhancedImageHeader(
             val isInWishlist by viewModel.isInWishlist.collectAsStateWithLifecycle()
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(onClick = { /* TODO: Share */ }, shape = CircleShape, color = Color.Black.copy(alpha = 0.4f), modifier = Modifier.size(48.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(24.dp)) }
-                }
-
                 Surface(
                     onClick = {
                         viewModel.toggleFavButton()
@@ -820,9 +829,11 @@ fun EnhancedPaxRow(
 @Composable
 fun EnhancedBookingActionBar(
     state: PackageDetailUiState.Success,
-    // TODO: onAddToCartClick: () -> Unit
+    onAddToCartClick: () -> Unit,
+    onBookNowClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val totalPrice = state.totalPrice
     val totalPax = state.paxCounts.values.sum()
     val hasSelection = totalPax > 0 && state.selectedDeparture != null
@@ -874,7 +885,10 @@ fun EnhancedBookingActionBar(
             ) {
                 if (hasSelection) {
                     OutlinedButton(
-                        onClick = { /* TODO: add to the cart  (onAddToCartClick)*/ },
+                        onClick = {
+                            onAddToCartClick()
+                            Toast.makeText(context, "Added to cart!", Toast.LENGTH_SHORT).show()
+                        },
                         modifier = Modifier.weight(1f).height(56.dp),
                         border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(16.dp)
@@ -885,7 +899,7 @@ fun EnhancedBookingActionBar(
                     }
 
                     Button(
-                        onClick = { /* TODO: navigate to checkout page */ },
+                        onClick = { onBookNowClick() },
                         modifier = Modifier.weight(1f).height(56.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)

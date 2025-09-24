@@ -26,7 +26,6 @@ class UserRepository @Inject constructor(
         return result.getOrNull()
     }
 
-    // ✅ Get users by type
     suspend fun getUsersByType(userType: UserType): List<User> {
         val result = userDataSource.getUsersByType(userType)
         return result.getOrElse { emptyList() }
