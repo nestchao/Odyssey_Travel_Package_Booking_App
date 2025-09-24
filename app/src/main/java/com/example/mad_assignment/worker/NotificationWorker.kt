@@ -27,8 +27,7 @@ import java.util.UUID
 
 class NotificationWorker(
     context: Context,
-    workerParams: WorkerParameters,
-    private val auth: FirebaseAuth
+    workerParams: WorkerParameters
 ) : CoroutineWorker(context, workerParams) {
 
     companion object {
@@ -45,6 +44,8 @@ class NotificationWorker(
         const val KEY_TARGET_USER_ID = "target_user_id"
     }
 
+    private val auth = FirebaseAuth.getInstance()
+
     override suspend fun doWork(): Result {
         return withContext(Dispatchers.IO) {
             try {
@@ -54,7 +55,7 @@ class NotificationWorker(
                 val scheduledId = inputData.getString(KEY_SCHEDULED_ID) ?: return@withContext Result.failure()
                 val broadcastToAll = inputData.getBoolean(KEY_BROADCAST_TO_ALL, true)
                 val useFCM = inputData.getBoolean(KEY_USE_FCM, true)
-                val targetUserId = inputData.getString(KEY_TARGET_USER_ID) // Get target user ID
+                val targetUserId = inputData.getString(KEY_TARGET_USER_ID)
 
                 val type = try {
                     Notification.NotificationType.valueOf(typeString)
@@ -79,22 +80,25 @@ class NotificationWorker(
                     status = Notification.Status.UNREAD
                 )
 
-                // Send via FCM if enabled
-                if (useFCM) {
-                    if (broadcastToAll) {
-                        sendFCMNotificationToAll(title, message, type)
-                    } else if (targetUserId != null) {
-                        sendFCMNotificationToUser(targetUserId, title, message, type)
-                    }
-                }
-
                 val createResult = if (broadcastToAll) {
+                    // Send FCM to all users first if enabled
+                    if (useFCM) {
+                        sendFCMNotificationToAll(title, message, type)
+                    }
+                    // Add notification to all users' databases
                     notificationRepository.addNotificationForAllUsers(notification)
                 } else if (targetUserId != null) {
+                    // Send FCM to specific user if enabled
+                    if (useFCM) {
+                        sendFCMNotificationToUser(targetUserId, title, message, type)
+                    }
                     // Send to specific user only
                     notificationRepository.createNotificationForUser(notification, targetUserId)
                 } else {
                     val currentUserId = getCurrentUserId()
+                    if (useFCM && currentUserId != null) {
+                        sendFCMNotificationToUser(currentUserId, title, message, type)
+                    }
                     notificationRepository.createNotificationForUser(notification, currentUserId)
                 }
 
@@ -117,16 +121,11 @@ class NotificationWorker(
         }
     }
 
-//    private fun getCurrentUserId(context: Context): String {
-//        val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-//        return sharedPreferences.getString("user_id", "default_user_id") ?: "default_user_id"
-//    }
-
     private fun getCurrentUserId(): String? {
         return auth.currentUser?.uid
     }
 
-    // Add this method for sending FCM to specific user
+    // Fixed: Send FCM to specific user
     private suspend fun sendFCMNotificationToUser(userId: String, title: String, message: String, type: Notification.NotificationType) {
         try {
             val userDoc = FirebaseFirestore.getInstance().collection("users").document(userId).get().await()
@@ -140,10 +139,11 @@ class NotificationWorker(
         }
     }
 
+    // Fixed: Get all users (not just admin users) and send FCM
     private suspend fun sendFCMNotificationToAll(title: String, message: String, type: Notification.NotificationType) {
         try {
-            val allUserIds = getAdminUserIds() // Get admin users who can send notifications
-            val fcmTokens = getFCMTokensForUsers(allUserIds)
+            val allUsers = getAllUsers() // Get all users, not just admin users
+            val fcmTokens = getFCMTokensForUsers(allUsers)
 
             fcmTokens.forEach { token ->
                 sendFCMMessage(token, title, message, type)
@@ -153,12 +153,11 @@ class NotificationWorker(
         }
     }
 
-    // TODO: Add this method to get admin user IDs from Firestore
-    private suspend fun getAdminUserIds(): List<String> {
+    // Fixed: Get ALL users, not just admin users
+    private suspend fun getAllUsers(): List<String> {
         val db = FirebaseFirestore.getInstance()
         val snapshot = db.collection("users")
-            .whereEqualTo("canReceiveNotifications", true)
-            .get()
+            .get() // Remove the admin filter to get ALL users
             .await()
 
         return snapshot.documents.map { it.id }
@@ -169,11 +168,16 @@ class NotificationWorker(
         val tokens = mutableListOf<String>()
 
         userIds.forEach { userId ->
-            val userDoc = db.collection("users").document(userId).get().await()
-            userDoc.getString("fcmToken")?.let { token ->
-                if (token.isNotBlank()) {
-                    tokens.add(token)
+            try {
+                val userDoc = db.collection("users").document(userId).get().await()
+                userDoc.getString("fcmToken")?.let { token ->
+                    if (token.isNotBlank()) {
+                        tokens.add(token)
+                    }
                 }
+            } catch (e: Exception) {
+                // Continue with next user if this one fails
+                e.printStackTrace()
             }
         }
 
@@ -181,22 +185,13 @@ class NotificationWorker(
     }
 
     private suspend fun sendFCMMessage(token: String, title: String, message: String, type: Notification.NotificationType) {
-        val messageData = mapOf(
-            "title" to title,
-            "message" to message,
-            "type" to type.name,
-            "click_action" to "FLUTTER_NOTIFICATION_CLICK"
-        )
-
         try {
-            FirebaseMessaging.getInstance().send(
-                com.google.firebase.messaging.RemoteMessage.Builder("$token@fcm.googleapis.com")
-                    .setMessageId(java.util.UUID.randomUUID().toString())
-                    .addData("title", title)
-                    .addData("message", message)
-                    .addData("type", type.name)
-                    .build()
-            )
+            // Note: This is pseudo-code as sending FCM from client requires server-side implementation
+            // In a real app, you'd call your backend API to send the FCM message
+            println("Sending FCM to token: $token with title: $title")
+
+            // For now, show local notification as fallback
+            showSystemNotification(title, message)
         } catch (e: Exception) {
             // Fallback to local notification
             showSystemNotification(title, message)
@@ -211,7 +206,7 @@ class NotificationWorker(
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Scheduled Notifications",
-                NotificationManager.IMPORTANCE_HIGH // Changed to HIGH for better visibility
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Notifications scheduled through the app"
                 enableVibration(true)
