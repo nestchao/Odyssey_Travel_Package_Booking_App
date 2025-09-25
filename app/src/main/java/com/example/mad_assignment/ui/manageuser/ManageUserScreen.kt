@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -19,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -608,108 +606,6 @@ private fun EmptyState(
     }
 }
 
-@Composable
-private fun EnhancedEditUserDialog(
-    user: User,
-    onDismiss: () -> Unit,
-    onConfirm: (User, UserType) -> Unit
-) {
-    var selectedType by remember { mutableStateOf(user.userType) }
-    val userRoles = listOf(UserType.CUSTOMER, UserType.ADMIN)
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "Edit User Role",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column {
-                Text(
-                    text = "Change role for ${user.firstName} ${user.lastName}",
-                    fontSize = 16.sp,
-                    color = Color(0xFF6B7280)
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                userRoles.forEach { role ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .selectable(
-                                selected = (selectedType == role),
-                                onClick = { selectedType = role },
-                                role = Role.RadioButton
-                            )
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (selectedType == role)
-                                    Color(0xFF6366F1).copy(alpha = 0.1f)
-                                else
-                                    Color.Transparent
-                            )
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = (selectedType == role),
-                            onClick = null,
-                            colors = RadioButtonDefaults.colors(
-                                selectedColor = Color(0xFF6366F1)
-                            )
-                        )
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Column {
-                            Text(
-                                text = role.name.lowercase().replaceFirstChar { it.titlecase() },
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF111827)
-                            )
-                            Text(
-                                text = if (role == UserType.ADMIN) "Full system access" else "Limited user access",
-                                fontSize = 12.sp,
-                                color = Color(0xFF6B7280)
-                            )
-                        }
-                    }
-
-                    if (role != userRoles.last()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onConfirm(user, selectedType) },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF6366F1)
-                ),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("Update Role")
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = Color(0xFF6B7280)
-                )
-            ) {
-                Text("Cancel")
-            }
-        },
-        shape = RoundedCornerShape(16.dp)
-    )
-}
 
 @Composable
 private fun DeleteConfirmationDialog(

@@ -15,6 +15,10 @@ class PaymentRepository @Inject constructor(
         private const val TAG = "PaymentRepository"
     }
 
+    suspend fun getAllPayments(): List<Payment> {
+        return paymentDataSource.getAllPayments()
+    }
+
     suspend fun initiatePayment(payment: Payment): Result<String> {
         return paymentDataSource.createPayment(payment)
             .onFailure { Log.e(TAG, "initiatePayment failed", it) }

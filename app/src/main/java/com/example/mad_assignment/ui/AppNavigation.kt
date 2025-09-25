@@ -46,8 +46,6 @@ import com.example.mad_assignment.ui.home.HomeScreen
 import com.example.mad_assignment.ui.management.ManagementScreen
 import com.example.mad_assignment.ui.managetravelpackage.manageTravelPackageScreen
 import com.example.mad_assignment.ui.managetrip.ManageTripScreen
-import com.example.mad_assignment.ui.manageuser.ManageUserScreen
-import com.example.mad_assignment.ui.manageuser.ManageUserViewModel
 import com.example.mad_assignment.ui.notifications.NotificationDetailsScreen
 import com.example.mad_assignment.ui.notifications.NotificationSchedulerScreen
 import com.example.mad_assignment.ui.notifications.NotificationsScreen
@@ -62,6 +60,13 @@ import com.example.mad_assignment.ui.signin.SignInViewModel
 import com.example.mad_assignment.ui.signup.SignUpScreen
 import com.example.mad_assignment.ui.signup.SignUpViewModel
 import com.example.mad_assignment.ui.wishlist.WishlistScreen
+import com.example.mad_assignment.ui.cart.CartScreen
+import com.example.mad_assignment.ui.checkout.CheckoutScreen
+import com.example.mad_assignment.ui.managepayment.ManagePaymentScreen
+import com.example.mad_assignment.ui.managepayment.ManagePaymentViewModel
+import com.example.mad_assignment.ui.manageuser.ManageUserScreen
+import com.example.mad_assignment.ui.manageuser.ManageUserViewModel
+import com.google.gson.Gson
 
 @Composable
 fun AppNavigation(){
@@ -135,6 +140,7 @@ fun AppNavigation(){
                 onNavigateToSettings = { navController.navigate("setting") },
                 onNavigateToRecentlyViewed = { navController.navigate("recentlyViewed") },
                 onNavigateToWishlist = { navController.navigate("wishlist") },
+                onNavigateToCart = { navController.navigate("cart") }
             )
         }
 
@@ -151,6 +157,7 @@ fun AppNavigation(){
                 onNavigateToSettings = { navController.navigate("setting") },
                 onNavigateToRecentlyViewed = { navController.navigate("recentlyViewed") },
                 onNavigateToWishlist = { navController.navigate("wishlist") },
+                onNavigateToCart = { navController.navigate("cart") },
             )
         }
 
@@ -158,13 +165,40 @@ fun AppNavigation(){
             route = "detail/{packageId}",
             arguments = listOf(navArgument("packageId") { type = NavType.StringType })
         ){
-            PackageDetailScreen(onNavigateBack = { navController.popBackStack() })
+            PackageDetailScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToCart = { navController.navigate("cart") },
+                onNavigateToCheckout = { packageId, departureId, paxCountsJson ->
+                    // We need to encode the JSON string so it can be safely passed in a URL
+                    val encodedPaxCounts = java.net.URLEncoder.encode(paxCountsJson, "UTF-8")
+                    navController.navigate(
+                        "checkout?packageId=$packageId&departureId=$departureId&paxCountsJson=$encodedPaxCounts"
+                    )
+                }
+            )
         }
 
         composable(route = "search"){
             SearchScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onPackageClick = { packageId -> navController.navigate("detail/$packageId") }
+            )
+        }
+
+        composable("cart") {
+            CartScreen(
+                onBackClick = { navController.popBackStack() },
+                onPackageDetailsClick = { cartItem -> navController.navigate("detail/${cartItem.packageId}") },
+                onPackagesClick = { navController.navigate("home") },
+                // The signature here now provides the cartId AND the selected item IDs
+                onCheckoutClick = { cartId, selectedItemIds ->
+                    // Serialize the list of IDs into a JSON array string
+                    val selectedItemIdsJson = Gson().toJson(selectedItemIds)
+                    // URL-encode the JSON string to make it safe for navigation
+                    val encodedSelectedItemIds = java.net.URLEncoder.encode(selectedItemIdsJson, "UTF-8")
+
+                    navController.navigate("checkout?cartId=$cartId&selectedItemIdsJson=$encodedSelectedItemIds")
+                }
             )
         }
 
@@ -270,8 +304,9 @@ fun AppNavigation(){
                 viewModel = viewModel,
                 onNavigateToUsers = { navController.navigate("manage_user") },
                 onNavigateToBookings = { navController.navigate("admin_bookings") },
-                onNavigateToAnalytics = { navController.navigate("admin_analytics") },
-                onNavigateToSettings = { navController.navigate("admin_settings") },
+                onNavigateToPackage = { navController.navigate("manage") },
+                onNavigateToPayment = { navController.navigate("manage_payment") },
+                onNavigateToNotifications = { navController.navigate("notificationScheduler") },
                 onSignOut = {
                     navController.navigate("signin") {
                         popUpTo("admin_dashboard") { inclusive = true }
@@ -279,12 +314,42 @@ fun AppNavigation(){
                 }
             )
         }
+        composable("manage_payment") {
+            val viewModel: ManagePaymentViewModel = hiltViewModel()
+            ManagePaymentScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
 
         composable("manage_user") {
             val viewModel: ManageUserViewModel = hiltViewModel()
             ManageUserScreen(
                 viewModel = viewModel,
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = "checkout?packageId={packageId}&departureId={departureId}&paxCountsJson={paxCountsJson}&cartId={cartId}&selectedItemIdsJson={selectedItemIdsJson}",
+            arguments = listOf(
+                navArgument("packageId") { type = NavType.StringType; nullable = true },
+                navArgument("departureId") { type = NavType.StringType; nullable = true },
+                navArgument("paxCountsJson") { type = NavType.StringType; nullable = true },
+                navArgument("cartId") { type = NavType.StringType; nullable = true },
+                navArgument("selectedItemIdsJson") { type = NavType.StringType; nullable = true }
+            )
+        ) {
+            CheckoutScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onPaymentSuccess = {
+                    // After successful payment, navigate to a confirmation or home screen,
+                    // clearing the back stack to prevent going back to checkout.
+                    navController.navigate(mainDestination) {
+                        popUpTo(mainDestination) { inclusive = true }
+                    }
+                }
             )
         }
     }
@@ -302,6 +367,7 @@ private fun PhoneContainerScreen(
     onBellClick: (String) -> Unit,
     onNavigateToWishlist: () -> Unit,
     onNavigateToRecentlyViewed: () -> Unit,
+    onNavigateToCart: () -> Unit,
 ) {
     val user by mainViewModel.currentUser.collectAsState()
     val contentNavController = rememberNavController()
@@ -318,7 +384,8 @@ private fun PhoneContainerScreen(
                 onNavigateToDetail = onNavigateToDetail,
                 onNavigateToSearch = onNavigateToSearch,
                 onNavigateToManagement = onNavigateToManagement,
-                onBellClick = onBellClick
+                onBellClick = onBellClick,
+                onNavigateToCart = onNavigateToCart
             )
 
             composable("profile") {
@@ -347,6 +414,7 @@ private fun TabletContainerScreen(
     onBellClick: (String) -> Unit,
     onNavigateToWishlist: () -> Unit,
     onNavigateToRecentlyViewed: () -> Unit,
+    onNavigateToCart: () -> Unit,
 ) {
     val user by mainViewModel.currentUser.collectAsState()
     val contentNavController = rememberNavController()
@@ -369,7 +437,8 @@ private fun TabletContainerScreen(
                     onNavigateToDetail = onNavigateToDetail,
                     onNavigateToSearch = onNavigateToSearch,
                     onNavigateToManagement = onNavigateToManagement,
-                    onBellClick = onBellClick
+                    onBellClick = onBellClick,
+                    onNavigateToCart = onNavigateToCart
                 )
                 composable("favorites") { PlaceholderScreen(screenName = "Favorites") }
                 composable("settings") { PlaceholderScreen(screenName = "Settings") }
@@ -398,6 +467,7 @@ private fun TabletContainerScreen(
             onBellClick = onBellClick,
             onNavigateToWishlist = onNavigateToWishlist,
             onNavigateToRecentlyViewed = onNavigateToRecentlyViewed,
+            onNavigateToCart = onNavigateToCart,
         )
     }
 }
@@ -406,14 +476,16 @@ private fun NavGraphBuilder.sharedAppGraph(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
     onNavigateToManagement: () -> Unit,
-    onBellClick: (String) -> Unit
+    onBellClick: (String) -> Unit,
+    onNavigateToCart: () -> Unit
 ) {
     composable("home") {
         HomeScreen(
             onPackageClick = onNavigateToDetail,
             onNavigateToSearch = onNavigateToSearch,
             onNavigateToManagement = onNavigateToManagement,
-            onBellClick = onBellClick
+            onBellClick = onBellClick,
+            onNavigateToCart = onNavigateToCart
         )
     }
     composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
