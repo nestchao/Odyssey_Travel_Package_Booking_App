@@ -2,13 +2,10 @@ package com.example.mad_assignment.ui.cart
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.mad_assignment.data.model.Cart
 import com.example.mad_assignment.data.model.CartItem
-import com.example.mad_assignment.data.model.TravelPackage
 import com.example.mad_assignment.data.model.TravelPackageWithImages
 import com.example.mad_assignment.data.repository.CartRepository
 import com.example.mad_assignment.data.repository.TravelPackageRepository
-import com.example.mad_assignment.ui.home.TravelPackageWithImages
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel

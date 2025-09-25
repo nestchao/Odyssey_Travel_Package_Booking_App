@@ -35,8 +35,6 @@ import coil.request.ImageRequest
 import com.example.mad_assignment.data.model.CartItem
 import com.example.mad_assignment.data.model.TravelPackage
 import com.example.mad_assignment.data.model.TravelPackageWithImages
-import com.example.mad_assignment.ui.home.TravelPackageWithImages
-import com.example.mad_assignment.ui.packagedetail.PackageDetailData
 import com.example.mad_assignment.util.toDataUri
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
