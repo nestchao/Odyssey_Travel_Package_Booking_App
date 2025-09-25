@@ -1,9 +1,11 @@
+// src/main/java/com/example/mad_assignment/ui/wishlist/WishlistViewModel.kt
 package com.example.mad_assignment.ui.wishlist
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.mad_assignment.data.model.TravelPackage
+// NO CHANGE to TravelPackage model import, it's not directly used here for the list type
+import com.example.mad_assignment.data.model.TravelPackageWithImages // Import this
 import com.example.mad_assignment.data.model.WishlistItem
 import com.example.mad_assignment.data.repository.WishlistRepository
 import com.example.mad_assignment.data.repository.TravelPackageRepository
@@ -50,14 +52,14 @@ class WishlistViewModel @Inject constructor(
 
                 Log.d("WishlistVM", "Found ${wishlistItems.size} wishlist items")
 
-                // Fetch the actual travel packages
-                val packages = mutableListOf<TravelPackage>()
+                // IMPORTANT CHANGE: Store TravelPackageWithImages directly
+                val packagesWithImages = mutableListOf<TravelPackageWithImages>()
 
                 for (item in wishlistItems) {
                     try {
                         val packageData = travelPackageRepository.getPackageWithImages(item.packageId)
                         packageData?.let {
-                            packages.add(it.travelPackage)
+                            packagesWithImages.add(it) // Add the whole TravelPackageWithImages object
                             Log.d("WishlistVM", "Loaded package: ${it.travelPackage.packageName}")
                         }
                     } catch (e: Exception) {
@@ -66,13 +68,13 @@ class WishlistViewModel @Inject constructor(
                     }
                 }
 
-                if (packages.isEmpty()) {
+                if (packagesWithImages.isEmpty()) {
                     Log.w("WishlistVM", "No valid packages found from wishlist items")
                     _uiState.value = WishlistUiState.Empty
                 } else {
-                    Log.d("WishlistVM", "Successfully loaded ${packages.size} packages")
+                    Log.d("WishlistVM", "Successfully loaded ${packagesWithImages.size} packages")
                     _uiState.value = WishlistUiState.Success(
-                        wishlistPackages = packages
+                        wishlistPackages = packagesWithImages // Pass the list of TravelPackageWithImages
                     )
                 }
 
@@ -103,8 +105,12 @@ class WishlistViewModel @Inject constructor(
                 wishlistItem?.let {
                     wishlistRepository.removeFromWishlist(userId, it.id)
                     loadWishlist() // Refresh the list
+                } ?: run {
+                    Log.w("WishlistVM", "Wishlist item for packageId $packageId not found for removal.")
+                    _uiState.value = WishlistUiState.Error("Wishlist item not found to remove.")
                 }
             } catch (e: Exception) {
+                Log.e("WishlistVM", "Error removing item by packageId: $packageId", e)
                 _uiState.value = WishlistUiState.Error("Failed to remove item: ${e.message}")
             }
         }

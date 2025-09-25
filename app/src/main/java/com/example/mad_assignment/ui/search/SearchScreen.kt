@@ -15,6 +15,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.Delete // NEW - for wishlist remove button
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -35,6 +38,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.mad_assignment.ui.home.EnhancedPackageCard
 import com.example.mad_assignment.ui.home.HomeUiState
+import com.example.mad_assignment.data.model.TravelPackageWithImages // NEW - needed for EnhancedPackageCard
+import coil.compose.AsyncImage // NEW
+import coil.request.ImageRequest // NEW
+import com.example.mad_assignment.util.toDataUri // NEW
+import androidx.compose.ui.platform.LocalContext // NEW
+import androidx.compose.ui.layout.ContentScale // NEW
+import androidx.compose.ui.text.style.TextOverflow
+
 
 @Composable
 fun SearchScreen(
@@ -45,6 +56,8 @@ fun SearchScreen(
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val latestPackages by viewModel.latestPackages.collectAsStateWithLifecycle()
+    val wishlistPackages by viewModel.wishlistPackages.collectAsStateWithLifecycle() // NEW
+    val recentlyViewedPackages by viewModel.recentlyViewedPackages.collectAsStateWithLifecycle() // NEW
 
     val contentVisible by remember {
         derivedStateOf { searchQuery.isNotBlank() }
@@ -92,11 +105,14 @@ fun SearchScreen(
                         onPackageClick = onPackageClick
                     )
                 } else {
-                    // MODIFIED: Pass the new state and click handler down
+                    // MODIFIED: Pass the new states and click handlers down
                     SearchEmptyState(
                         onSuggestionClick = viewModel::onSearchQueryChange,
                         latestPackagesState = latestPackages,
-                        onPackageClick = onPackageClick
+                        wishlistPackagesState = wishlistPackages, // NEW
+                        recentlyViewedPackagesState = recentlyViewedPackages, // NEW
+                        onPackageClick = onPackageClick,
+                        onRemoveFromWishlist = viewModel::removeFromWishlistByPackageId // NEW
                     )
                 }
             }
@@ -114,7 +130,6 @@ private fun EnhancedSearchTopBar(
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    // Animation for search bar
     val searchBarScale by animateFloatAsState(
         targetValue = if (searchQuery.isNotEmpty()) 1.02f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
@@ -138,7 +153,6 @@ private fun EnhancedSearchTopBar(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Back button with ripple effect
             IconButton(
                 onClick = onNavigateBack,
                 modifier = Modifier
@@ -157,7 +171,6 @@ private fun EnhancedSearchTopBar(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Enhanced search field
             TextField(
                 value = searchQuery,
                 onValueChange = onSearchQueryChange,
@@ -219,7 +232,6 @@ private fun SearchResults(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Results header with animation
         item {
             androidx.compose.animation.AnimatedVisibility(
                 visible = true,
@@ -276,13 +288,15 @@ private fun SearchResults(
 @Composable
 private fun SearchEmptyState(
     onSuggestionClick: (String) -> Unit,
-    // NEW: Accept latest packages state and a click handler
     latestPackagesState: HomeUiState,
-    onPackageClick: (String) -> Unit
+    wishlistPackagesState: HomeUiState, // NEW
+    recentlyViewedPackagesState: HomeUiState, // NEW
+    onPackageClick: (String) -> Unit,
+    onRemoveFromWishlist: (String) -> Unit // NEW
 ) {
-    // NEW: Manage the selected tab state here
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
-    val tabs = listOf("Wishlist", "Nearby", "New")
+    // Renamed "Nearby" to "Recently Viewed"
+    val tabs = listOf("Wishlist", "Recently Viewed", "New")
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -303,7 +317,6 @@ private fun SearchEmptyState(
                 visible = true,
                 enter = slideInVertically() + fadeIn(tween(durationMillis = 200))
             ) {
-                // MODIFIED: Pass state and callback to the tabs
                 EnhancedFilterTabs(
                     tabs = tabs,
                     selectedTabIndex = selectedTabIndex,
@@ -312,7 +325,6 @@ private fun SearchEmptyState(
             }
         }
 
-        // NEW: Conditionally display content based on the selected tab
         item {
             AnimatedContent(
                 targetState = selectedTabIndex,
@@ -323,11 +335,15 @@ private fun SearchEmptyState(
                 }
             ) { tabIndex ->
                 when (tabIndex) {
-                    // Placeholder for "Wishlist"
-                    0 -> TabContentPlaceholder(title = "Your Wishlist", message = "Packages you save will appear here.")
-                    // Placeholder for "Nearby"
-                    1 -> TabContentPlaceholder(title = "Packages Nearby", message = "Discover amazing adventures close to you.")
-                    // Content for "New"
+                    0 -> WishlistTabContent( // NEW
+                        wishlistPackagesState = wishlistPackagesState,
+                        onPackageClick = onPackageClick,
+                        onRemoveFromWishlist = onRemoveFromWishlist
+                    )
+                    1 -> RecentlyViewedTabContent( // NEW
+                        recentlyViewedPackagesState = recentlyViewedPackagesState,
+                        onPackageClick = onPackageClick
+                    )
                     2 -> LatestPackagesContent(
                         latestPackagesState = latestPackagesState,
                         onPackageClick = onPackageClick
@@ -338,10 +354,8 @@ private fun SearchEmptyState(
     }
 }
 
-
 @Composable
 private fun EnhancedFilterTabs(
-    // MODIFIED: Make this composable stateless by accepting state and a callback
     tabs: List<String>,
     selectedTabIndex: Int,
     onTabSelected: (Int) -> Unit
@@ -370,7 +384,6 @@ private fun EnhancedFilterTabs(
 
                 Tab(
                     selected = isSelected,
-                    // MODIFIED: Use the callback to update the state
                     onClick = { onTabSelected(index) },
                     modifier = Modifier
                         .scale(animatedScale)
@@ -501,94 +514,7 @@ private fun PopularSearches(onSuggestionClick: (String) -> Unit) {
     }
 }
 
-@Composable
-private fun EnhancedFilterTabs() {
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Wishlist", "Nearby", "New")
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        )
-    ) {
-        TabRow(
-            selectedTabIndex = selectedTabIndex,
-            modifier = Modifier.clip(RoundedCornerShape(16.dp)),
-            containerColor = Color.Transparent,
-            indicator = { },
-            divider = { }
-        ) {
-            tabs.forEachIndexed { index, title ->
-                val isSelected = selectedTabIndex == index
-                val animatedScale by animateFloatAsState(
-                    targetValue = if (isSelected) 1.05f else 1f,
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-                    label = "tab_scale"
-                )
-
-                Tab(
-                    selected = isSelected,
-                    onClick = { selectedTabIndex = index },
-                    modifier = Modifier
-                        .scale(animatedScale)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            if (isSelected)
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                            else Color.Transparent
-                        ),
-                    text = {
-                        Text(
-                            title,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected)
-                                MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SearchPrompt() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 32.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                Icons.Default.Search,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(48.dp)
-                    .alpha(0.6f),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                "Start your adventure",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                "Search for your next travel destination",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
+// Removed the duplicate EnhancedFilterTabs and SearchPrompt functions
 
 @Composable
 private fun LoadingState() {
@@ -725,6 +651,76 @@ private fun LatestPackagesContent(
     }
 }
 
+// NEW: Wishlist Content Composable
+@Composable
+private fun WishlistTabContent(
+    wishlistPackagesState: HomeUiState,
+    onPackageClick: (String) -> Unit,
+    onRemoveFromWishlist: (String) -> Unit
+) {
+    when (wishlistPackagesState) {
+        is HomeUiState.Loading -> {
+            LoadingState()
+        }
+        is HomeUiState.Success -> {
+            if (wishlistPackagesState.packages.isEmpty()) {
+                TabContentPlaceholder(
+                    title = "Your Wishlist is Empty",
+                    message = "Add packages to your wishlist to see them here."
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    wishlistPackagesState.packages.forEach { packageWithImages ->
+                        // Using a slightly modified card for wishlist to include remove button
+                        WishlistPackageSearchCard(
+                            travelPackageWithImages = packageWithImages,
+                            onRemove = { onRemoveFromWishlist(packageWithImages.travelPackage.packageId) },
+                            onClick = { onPackageClick(packageWithImages.travelPackage.packageId) }
+                        )
+                    }
+                }
+            }
+        }
+        is HomeUiState.Error -> {
+            ErrorState(message = wishlistPackagesState.message)
+        }
+    }
+}
+
+// NEW: Recently Viewed Content Composable
+@Composable
+private fun RecentlyViewedTabContent(
+    recentlyViewedPackagesState: HomeUiState,
+    onPackageClick: (String) -> Unit
+) {
+    when (recentlyViewedPackagesState) {
+        is HomeUiState.Loading -> {
+            LoadingState()
+        }
+        is HomeUiState.Success -> {
+            if (recentlyViewedPackagesState.packages.isEmpty()) {
+                TabContentPlaceholder(
+                    title = "No Recently Viewed Packages",
+                    message = "Explore packages to see them in your recent history."
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    recentlyViewedPackagesState.packages.forEach { packageWithImages ->
+                        EnhancedPackageCard(
+                            packageData = packageWithImages,
+                            onClick = { onPackageClick(packageWithImages.travelPackage.packageId) }
+                        )
+                    }
+                }
+            }
+        }
+        is HomeUiState.Error -> {
+            ErrorState(message = recentlyViewedPackagesState.message)
+        }
+    }
+}
+
+
 @Composable
 private fun TabContentPlaceholder(title: String, message: String) {
     Box(
@@ -749,6 +745,136 @@ private fun TabContentPlaceholder(title: String, message: String) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
+        }
+    }
+}
+
+
+// NEW: Custom Card for Wishlist in Search, similar to EnhancedPackageCard but with a remove option
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WishlistPackageSearchCard(
+    travelPackageWithImages: TravelPackageWithImages,
+    onRemove: () -> Unit,
+    onClick: () -> Unit
+) {
+    val travelPackage = travelPackageWithImages.travelPackage
+    val primaryImageUrl = travelPackageWithImages.images.firstOrNull()?.base64Data
+    val context = LocalContext.current
+
+    Card(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .height(120.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Image
+            Box(
+                modifier = Modifier
+                    .width(120.dp)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.2f)
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!primaryImageUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(toDataUri(primaryImageUrl))
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = travelPackage.packageName,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        Icons.Outlined.Image,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = travelPackage.packageName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Schedule,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            "${travelPackage.durationDays}D ${travelPackage.durationDays - 1}N",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column {
+                        val price = travelPackage.pricing.values.minOrNull() ?: 0.0
+                        Text(
+                            "From RM ${"%.0f".format(price)}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
+            // Remove button
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.padding(end = 8.dp)
+            ) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Remove from Wishlist",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 }
