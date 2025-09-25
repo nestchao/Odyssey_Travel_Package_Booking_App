@@ -586,84 +586,81 @@ private fun EnhancedPaymentDetailsCard(
                 )
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                // Expiry Date
-                OutlinedTextField(
-                    value = expiryDate,
-                    onValueChange = onExpiryDateChange,
-                    // FIXED: Changed from weight(1f) to weight(0.6f) to give it more space
-                    modifier = Modifier.weight(0.6f),
-                    label = { Text("MM/YY") },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Default.CalendarToday,
-                            contentDescription = null,
-                            tint = if (expiryDate.isNotEmpty()) {
-                                if (isExpiryValid) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.error
-                            } else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(15.dp)
-                        )
-                    },
-                    trailingIcon = {
-                        if (expiryDate.isNotEmpty()) {
-                            Icon(
-                                if (isExpiryValid) Icons.Default.CheckCircle else Icons.Default.Error,
-                                contentDescription = null,
-                                tint = if (isExpiryValid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                    visualTransformation = ExpiryDateVisualTransformation(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = if (isExpiryValid || expiryDate.isEmpty())
-                            MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+            // Expiry Date
+            OutlinedTextField(
+                value = expiryDate,
+                onValueChange = onExpiryDateChange,
+                modifier = Modifier.fillMaxWidth(), // FIXED: Let it take the full width
+                label = { Text("MM/YY") },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.CalendarToday,
+                        contentDescription = null,
+                        tint = if (expiryDate.isNotEmpty()) {
+                            if (isExpiryValid) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.error
+                        } else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp)
                     )
+                },
+                trailingIcon = {
+                    if (expiryDate.isNotEmpty()) {
+                        Icon(
+                            if (isExpiryValid) Icons.Default.CheckCircle else Icons.Default.Error,
+                            contentDescription = null,
+                            tint = if (isExpiryValid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                visualTransformation = ExpiryDateVisualTransformation(),
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = if (isExpiryValid || expiryDate.isEmpty())
+                        MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                 )
+            )
 
-                // CVC
-                OutlinedTextField(
-                    value = cvc,
-                    onValueChange = onCvcChange,
-                    // FIXED: Changed from weight(1f) to weight(0.4f)
-                    modifier = Modifier.weight(0.4f),
-                    label = { Text("CVC") },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Default.Security,
-                            contentDescription = null,
-                            tint = if (cvc.isNotEmpty()) {
-                                if (isCvcValid) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.error
-                            } else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(15.dp)
-                        )
-                    },
-                    trailingIcon = {
-                        if (cvc.isNotEmpty()) {
-                            Icon(
-                                if (isCvcValid) Icons.Default.CheckCircle else Icons.Default.Error,
-                                contentDescription = null,
-                                tint = if (isCvcValid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = if (isCvcValid || cvc.isEmpty())
-                            MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+            // CVC
+            OutlinedTextField(
+                value = cvc,
+                onValueChange = onCvcChange,
+                modifier = Modifier.fillMaxWidth(), // FIXED: Let it take the full width
+                label = { Text("CVC") },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Security,
+                        contentDescription = null,
+                        tint = if (cvc.isNotEmpty()) {
+                            if (isCvcValid) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.error
+                        } else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp)
                     )
+                },
+                trailingIcon = {
+                    if (cvc.isNotEmpty()) {
+                        Icon(
+                            if (isCvcValid) Icons.Default.CheckCircle else Icons.Default.Error,
+                            contentDescription = null,
+                            tint = if (isCvcValid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = if (isCvcValid || cvc.isEmpty())
+                        MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                 )
-            }
+            )
         }
-    }
+        }
+
 }
 
 @Composable
