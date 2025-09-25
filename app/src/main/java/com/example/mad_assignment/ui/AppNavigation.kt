@@ -63,6 +63,7 @@ import com.example.mad_assignment.ui.wishlist.WishlistScreen
 import com.example.mad_assignment.ui.cart.CartScreen
 import com.example.mad_assignment.ui.checkout.CheckoutScreen
 import com.google.gson.Gson
+import com.example.mad_assignment.ui.cart.CartScreen
 
 @Composable
 fun AppNavigation(){
@@ -145,6 +146,8 @@ fun AppNavigation(){
             TabletContainerScreen(
                 mainViewModel = mainViewModel,
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
+                onNavigateToSearch = { navController.navigate("search") },
+                onNavigateToCart = { navController.navigate("cart") }
                 onNavigateToSearch = { navController.navigate("search") },
                 onNavigateToManagement = { navController.navigate("manage") },
                 onBellClick = { navController.navigate("notifications") },
