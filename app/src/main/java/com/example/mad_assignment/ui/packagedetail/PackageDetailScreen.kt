@@ -1,11 +1,35 @@
 package com.example.mad_assignment.ui.packagedetail
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -15,10 +39,38 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Directions
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.EventAvailable
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,18 +93,12 @@ import com.example.mad_assignment.data.model.DepartureAndEndTime
 import com.example.mad_assignment.data.model.TravelPackage
 import com.example.mad_assignment.data.model.TravelPackageWithImages
 import com.example.mad_assignment.data.model.Trip
+import com.example.mad_assignment.util.toDataUri
 import com.google.firebase.Timestamp
+import com.google.gson.Gson
 import java.text.SimpleDateFormat
 import java.util.Locale
-import com.example.mad_assignment.util.toDataUri
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.net.Uri
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import android.widget.Toast
-import androidx.compose.runtime.remember
-import com.google.gson.Gson
+import androidx.compose.material.icons.filled.Chat
 
 @Composable
 fun PackageDetailScreen(
@@ -65,7 +111,7 @@ fun PackageDetailScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { paddingValues ->
         Box(modifier = Modifier
             .fillMaxSize()
@@ -104,7 +150,11 @@ fun PackageDetailScreen(
                             .asPaddingValues()
                     ) {
                         item {
-                            EnhancedImageHeader(state.packageDetail, onNavigateBack)
+                            EnhancedImageHeader(
+                                packageDetail = state.packageDetail,
+                                onNavigateBack = onNavigateBack,
+                                onShowChat = { viewModel.showChat(true) } // Pass the function here
+                            )
                         }
                         item {
                             PackageTitle(state.packageDetail.travelPackage)
@@ -145,16 +195,12 @@ fun PackageDetailScreen(
                     EnhancedBookingActionBar(
                         state = state,
                         onAddToCartClick = { viewModel.addToCart() },
-                        // ADD THE onBookNowClick HANDLER
                         onBookNowClick = {
-                            // Ensure all required data is available before navigating
                             val packageId = state.packageDetail.travelPackage.packageId
                             val departureId = state.selectedDeparture?.id
                             val paxCounts = state.paxCounts
 
                             if (departureId != null && packageId.isNotBlank()) {
-                                // Serialize the map to a JSON string to pass as a nav argument
-                                // Your old code used a custom format, JSON is more robust.
                                 val paxCountsJson = Gson().toJson(paxCounts)
                                 onNavigateToCheckout(packageId, departureId, paxCountsJson)
                             }
@@ -163,6 +209,15 @@ fun PackageDetailScreen(
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding()
                     )
+
+                    if (state.isChatVisible) {
+                        ChatAssistantBottomSheet(
+                            chatState = state.chatState,
+                            onDismiss = { viewModel.showChat(false) },
+                            onPromptChange = { viewModel.onChatPromptChanged(it) },
+                            onSendMessage = { viewModel.sendChatMessage(it) }
+                        )
+                    }
                 }
 
                 is PackageDetailUiState.Error -> {
@@ -262,7 +317,8 @@ fun EnhancedDateSelector(
             ) {
                 items(items = departures, key = { it.id }) { departure ->
                     val isSelected = departure.id == selectedDeparture?.id
-                    val spotsLeft = departure.capacity
+                    // CORRECTED LINE: Use numberOfPeopleBooked
+                    val spotsLeft = departure.capacity - departure.numberOfPeopleBooked
                     val isSoldOut = spotsLeft <= 0
 
                     val backgroundColor by animateColorAsState(
@@ -581,7 +637,8 @@ fun EnhancedLocationSection(itineraryTrips: Map<Int, List<Trip>>) {
 @Composable
 fun EnhancedImageHeader(
     packageDetail: TravelPackageWithImages,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onShowChat: () -> Unit // New parameter for showing chat
 ) {
     val images = packageDetail.images
     val pagerState = rememberPagerState(pageCount = { images.size })
@@ -650,6 +707,24 @@ fun EnhancedImageHeader(
             val isInWishlist by viewModel.isInWishlist.collectAsStateWithLifecycle()
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Chat Assistant Button
+                Surface(
+                    onClick = onShowChat, // Call the new onShowChat lambda
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.4f),
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.Chat, // Chat icon
+                            contentDescription = "AI Assistant",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                // Wishlist Button
                 Surface(
                     onClick = {
                         viewModel.toggleFavButton()

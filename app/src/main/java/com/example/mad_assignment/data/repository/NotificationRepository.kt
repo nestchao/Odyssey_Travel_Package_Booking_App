@@ -6,6 +6,7 @@ import com.example.mad_assignment.data.datasource.ScheduledNotificationDataSourc
 import com.example.mad_assignment.data.model.Notification
 import com.example.mad_assignment.data.model.ScheduledNotification
 import com.example.mad_assignment.worker.NotificationScheduler
+import com.example.mad_assignment.worker.NotificationWorker
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -272,7 +273,22 @@ class NotificationRepository @Inject constructor(
     }
 
     suspend fun addNotificationForAllUsers(notification: Notification): Result<List<String>> {
-        val userIds = dataSource.getAllUserIds().getOrElse { emptyList() }
-        return dataSource.addNotificationForUsers(notification, userIds)
+        return try {
+            val userIds = dataSource.getAllUserIds().getOrElse {
+                println("Failed to get user IDs, using empty list")
+                emptyList()
+            }
+
+            if (userIds.isEmpty()) {
+                println("No users found to send notification to")
+                return Result.failure(Exception("No users found"))
+            }
+
+            println("Sending notification to ${userIds.size} users")
+            dataSource.addNotificationForUsers(notification, userIds)
+        } catch (e: Exception) {
+            println("Error in addNotificationForAllUsers: ${e.message}")
+            Result.failure(e)
+        }
     }
 }

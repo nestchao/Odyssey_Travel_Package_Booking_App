@@ -4,8 +4,7 @@ import com.example.mad_assignment.data.model.TravelPackageWithImages
 
 sealed interface HomeUiState{
     data class Success(
-        val packages: List<TravelPackageWithImages>,
-        val isAdmin: Boolean = false
+        val packages: List<TravelPackageWithImages>
     ) : HomeUiState
     data class Error(val message: String): HomeUiState
     object Loading : HomeUiState

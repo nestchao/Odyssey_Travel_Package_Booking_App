@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.example.mad_assignment.ui.AppNavigation
 import com.example.mad_assignment.ui.theme.MAD_ASSIGNMENTTheme
-import com.example.mad_assignment.util.DataUploader
+//import com.example.mad_assignment.util.DataUploader
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import dagger.hilt.android.AndroidEntryPoint
