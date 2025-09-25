@@ -43,51 +43,64 @@ class ManageUserViewModel @Inject constructor(
         }
     }
 
-    fun updateUserType(userId: String, newType: UserType) {
-        viewModelScope.launch {
-            try {
-                userRepository.updateUserType(userId, newType)
-                loadUsers() // Reload the list after update
-            } catch (e: Exception) {
-                _uiState.value = ManageUserUiState.Error("Failed to update user: ${e.message}")
-            }
-        }
-    }
 
     fun deleteUser(userId: String) {
         viewModelScope.launch {
             try {
-                userRepository.deleteUser(userId)
-                loadUsers() // Reload the list after deletion
+                onDismissDialog() // Dismiss dialog for snappy UI
+                if (userRepository.deleteUser(userId)) {
+                    loadUsers() // Reload the list after deletion
+                } else {
+                    _uiState.value = ManageUserUiState.Error("Failed to delete user.")
+                }
             } catch (e: Exception) {
                 _uiState.value = ManageUserUiState.Error("Failed to delete user: ${e.message}")
             }
         }
     }
 
+    fun onEditUserClicked(user: User) {
+        val currentState = _uiState.value
+        if (currentState is ManageUserUiState.Success) {
+            _uiState.value = currentState.copy(showEditDialog = true, selectedUser = user)
+        }
+    }
+
+    fun onDeleteUserClicked(user: User) {
+        val currentState = _uiState.value
+        if (currentState is ManageUserUiState.Success) {
+            _uiState.value = currentState.copy(showDeleteDialog = true, selectedUser = user)
+        }
+    }
+
+    fun onDismissDialog() {
+        val currentState = _uiState.value
+        if (currentState is ManageUserUiState.Success) {
+            _uiState.value = currentState.copy(
+                showEditDialog = false,
+                showDeleteDialog = false,
+                selectedUser = null
+            )
+        }
+    }
+
     fun updateUserInfo(user: User) {
         viewModelScope.launch {
             try {
-
+                onDismissDialog() // Dismiss dialog for snappy UI
                 val userUpdates = mapOf(
                     "gender" to user.gender.name,
                     "firstName" to user.firstName,
                     "lastName" to user.lastName,
-                    "userEmail" to user.userEmail,
+                    "userPhoneNumber" to user.userPhoneNumber,
                     "userType" to user.userType.name
                 )
-
-                val wasSuccessful = userRepository.updateUser(user.userID, userUpdates)
-
-                if (wasSuccessful) {
+                if (userRepository.updateUser(user.userID, userUpdates)) {
                     loadUsers()
                 } else {
-                    _uiState.value =
-                        ManageUserUiState.Error("Failed to update user. Please try again.")
+                    _uiState.value = ManageUserUiState.Error("Failed to update user.")
                 }
-
             } catch (e: Exception) {
-
                 _uiState.value = ManageUserUiState.Error("An error occurred: ${e.message}")
             }
         }

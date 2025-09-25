@@ -8,6 +8,7 @@ import com.example.mad_assignment.data.model.TravelPackage
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.Query
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -22,6 +23,20 @@ class BookingDataSource @Inject constructor(
         private const val CART_ITEMS_COLLECTION = "cartItems"
         private const val PACKAGES_COLLECTION = "packages"
         private const val TAG = "BookingDataSource"
+    }
+
+    suspend fun getAllBookings(): Result<List<Booking>> {
+        return try {
+            val snapshot = firestore.collection(BOOKINGS_COLLECTION)
+                .orderBy("createdAt", Query.Direction.DESCENDING) // Shows newest bookings first
+                .get()
+                .await()
+            val bookings = snapshot.toObjects(Booking::class.java)
+            Result.success(bookings)
+        } catch (e: Exception) {
+            Log.e(TAG, "getAllBookings failed", e)
+            Result.failure(RuntimeException("Failed to retrieve all bookings", e))
+        }
     }
 
     suspend fun createBooking(newBooking: Booking): Result<String> {

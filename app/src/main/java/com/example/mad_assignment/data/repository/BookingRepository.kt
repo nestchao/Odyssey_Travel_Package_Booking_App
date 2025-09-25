@@ -16,6 +16,11 @@ class BookingRepository @Inject constructor(
         private const val TAG = "BookingRepository"
     }
 
+    suspend fun getAllBookings(): Result<List<Booking>> {
+        return bookingDataSource.getAllBookings()
+            .onFailure { Log.e(TAG, "getAllBookings failed", it) }
+    }
+
     suspend fun createBooking(newBooking: Booking): Result<String> {
         return bookingDataSource.createBooking(newBooking)
             .onFailure { Log.e(TAG, "createBooking failed", it) }

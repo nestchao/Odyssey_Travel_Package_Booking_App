@@ -62,6 +62,8 @@ import com.example.mad_assignment.ui.signup.SignUpViewModel
 import com.example.mad_assignment.ui.wishlist.WishlistScreen
 import com.example.mad_assignment.ui.cart.CartScreen
 import com.example.mad_assignment.ui.checkout.CheckoutScreen
+import com.example.mad_assignment.ui.managebooking.ManageBookingScreen
+import com.example.mad_assignment.ui.managebooking.ManageBookingViewModel
 import com.example.mad_assignment.ui.managepayment.ManagePaymentScreen
 import com.example.mad_assignment.ui.managepayment.ManagePaymentViewModel
 import com.example.mad_assignment.ui.manageuser.ManageUserScreen
@@ -302,7 +304,7 @@ fun AppNavigation(){
             AdminDashboardScreen(
                 viewModel = viewModel,
                 onNavigateToUsers = { navController.navigate("manage_user") },
-                onNavigateToBookings = { navController.navigate("admin_bookings") },
+                onNavigateToBookings = { navController.navigate("manage_booking") },
                 onNavigateToPackage = { navController.navigate("manage") },
                 onNavigateToPayment = { navController.navigate("manage_payment") },
                 onNavigateToNotifications = { navController.navigate("notificationScheduler") },
@@ -316,6 +318,14 @@ fun AppNavigation(){
         composable("manage_payment") {
             val viewModel: ManagePaymentViewModel = hiltViewModel()
             ManagePaymentScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable("manage_booking") {
+            val viewModel: ManageBookingViewModel = hiltViewModel()
+            ManageBookingScreen(
                 viewModel = viewModel,
                 onNavigateBack = { navController.popBackStack() }
             )

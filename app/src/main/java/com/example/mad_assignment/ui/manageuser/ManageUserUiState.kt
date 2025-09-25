@@ -10,6 +10,7 @@ sealed interface ManageUserUiState {
         val isRefreshing: Boolean = false,
         val selectedFilter: UserType? = null,
         val showEditDialog: Boolean = false,
+        val showDeleteDialog: Boolean = false,
         val selectedUser: User? = null
     ) : ManageUserUiState
     data class Error(val message: String, val users: List<User> = emptyList()) : ManageUserUiState

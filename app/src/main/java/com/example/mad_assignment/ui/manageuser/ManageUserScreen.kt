@@ -7,12 +7,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -85,7 +88,13 @@ fun ManageUserScreen(
                     users = state.users,
                     selectedFilter = state.selectedFilter,
                     onFilterChanged = viewModel::filterUsers,
-                    viewModel = viewModel
+                    viewModel = viewModel,
+                    showEditDialog = state.showEditDialog,
+                    showDeleteDialog = state.showDeleteDialog,
+                    selectedUser = state.selectedUser,
+                    onEditUserClicked = viewModel::onEditUserClicked,
+                    onDeleteUserClicked = viewModel::onDeleteUserClicked,
+                    onDismissDialog = viewModel::onDismissDialog
                 )
             }
         }
@@ -209,11 +218,14 @@ private fun ManageUserContent(
     users: List<User>,
     selectedFilter: UserType?,
     onFilterChanged: (UserType?) -> Unit,
-    viewModel: ManageUserViewModel
+    viewModel: ManageUserViewModel,
+    showEditDialog: Boolean,
+    showDeleteDialog: Boolean,
+    selectedUser: User?,
+    onEditUserClicked: (User) -> Unit,
+    onDeleteUserClicked: (User) -> Unit,
+    onDismissDialog: () -> Unit
 ) {
-    var showEditDialog by remember { mutableStateOf(false) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    var selectedUser by remember { mutableStateOf<User?>(null) }
 
     val filteredUsers = if (selectedFilter != null) {
         users.filter { it.userType == selectedFilter }
@@ -297,7 +309,6 @@ private fun ManageUserContent(
                 item {
                     EmptyState(
                         filter = selectedFilter,
-                        onClearFilter = { onFilterChanged(null) }
                     )
                 }
             } else {
@@ -308,12 +319,10 @@ private fun ManageUserContent(
                     EnhancedUserCard(
                         user = user,
                         onEdit = {
-                            selectedUser = user
-                            showEditDialog = true
+                            onEditUserClicked(user)
                         },
                         onDelete = {
-                            selectedUser = user
-                            showDeleteDialog = true
+                            onDeleteUserClicked(user)
                         }
                     )
                 }
@@ -325,34 +334,25 @@ private fun ManageUserContent(
     // Dialogs
     if (showEditDialog && selectedUser != null) {
         EnhancedEditUserInfoDialog(
-            user = selectedUser!!,
-            onDismiss = {
-                showEditDialog = false
-                selectedUser = null
-            },
+            user = selectedUser,
+            onDismiss = onDismissDialog,
             onConfirm = { updatedUser ->
                 viewModel.updateUserInfo(updatedUser)
-                showEditDialog = false
-                selectedUser = null
             }
         )
     }
 
     if (showDeleteDialog && selectedUser != null) {
         DeleteConfirmationDialog(
-            user = selectedUser!!,
-            onDismiss = {
-                showDeleteDialog = false
-                selectedUser = null
-            },
+            user = selectedUser,
+            onDismiss = onDismissDialog,
             onConfirm = {
-                viewModel.deleteUser(selectedUser!!.userID)
-                showDeleteDialog = false
-                selectedUser = null
+                viewModel.deleteUser(selectedUser.userID)
             }
         )
     }
 }
+
 
 @Composable
 private fun StatCard(
@@ -556,7 +556,6 @@ private fun EnhancedUserCard(
 @Composable
 private fun EmptyState(
     filter: UserType?,
-    onClearFilter: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -588,21 +587,6 @@ private fun EmptyState(
             modifier = Modifier.padding(top = 8.dp)
         )
 
-        if (filter != null) {
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedButton(
-                onClick = onClearFilter,
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = Color(0xFF6366F1)
-                ),
-                border = ButtonDefaults.outlinedButtonBorder.copy(
-                    brush = SolidColor(Color(0xFF6366F1))
-                )
-            ) {
-                Text("Clear Filter")
-            }
-        }
     }
 }
 
@@ -688,9 +672,11 @@ private fun EnhancedEditUserInfoDialog(
             )
         },
         text = {
+            val scrollState = rememberScrollState()
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(scrollState)
                     .padding(vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
