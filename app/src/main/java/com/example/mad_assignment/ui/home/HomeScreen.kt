@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.DriveEta
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Favorite
@@ -50,6 +51,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TravelExplore
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -124,7 +126,8 @@ fun HomeScreen(
     onPackageClick: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
     onNavigateToManagement: () -> Unit,
-    onBellClick: (String) -> Unit
+    onBellClick: (String) -> Unit,
+    onNavigateToCart: () -> Unit
 ) {
     val viewModel: HomeViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -150,14 +153,16 @@ fun HomeScreen(
                 TabletHomeScreen(
                     uiState = uiState,
                     onPackageClick = onPackageClick,
-                    onNavigateToSearch = onNavigateToSearch
+                    onNavigateToSearch = onNavigateToSearch,
+                    onNavigateToCart = onNavigateToCart,
                 )
             } else {
                 PhoneHomeScreen(
                     uiState = uiState,
                     onPackageClick = onPackageClick,
                     onNavigateToSearch = onNavigateToSearch,
-                    onBellClick = onBellClick
+                    onBellClick = onBellClick,
+                    onNavigateToCart = onNavigateToCart
                 )
             }
         }
@@ -170,7 +175,8 @@ fun PhoneHomeScreen(
     uiState: HomeUiState,
     onPackageClick: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
-    onBellClick: (String) -> Unit
+    onBellClick: (String) -> Unit,
+    onNavigateToCart: () -> Unit
 ) {
     Box(
         modifier = Modifier.fillMaxSize()
@@ -184,7 +190,8 @@ fun PhoneHomeScreen(
                     packages = state.packages,
                     onPackageClick = onPackageClick,
                     onNavigateToSearch = onNavigateToSearch,
-                    onBellClick = onBellClick
+                    onBellClick = onBellClick,
+                    onNavigateToCart = onNavigateToCart
                 )
             }
             is HomeUiState.Error -> {
@@ -199,14 +206,19 @@ fun EnhancedHomeContent(
     packages: List<TravelPackageWithImages>,
     onPackageClick: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
-    onBellClick: (String) -> Unit
+    onBellClick: (String) -> Unit,
+    onNavigateToCart: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
-            EnhancedHomeHeader(onNavigateToSearch = onNavigateToSearch, onBellClick = onBellClick)
+            EnhancedHomeHeader(
+                onNavigateToSearch = onNavigateToSearch,
+                onBellClick = onBellClick,
+                onNavigateToCart = onNavigateToCart
+            )
         }
         item { WelcomeSection() }
         item {
@@ -234,7 +246,8 @@ fun EnhancedHomeContent(
 @Composable
 fun EnhancedHomeHeader(
     onNavigateToSearch: () -> Unit,
-    onBellClick: (String) -> Unit
+    onBellClick: (String) -> Unit,
+    onNavigateToCart: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -267,7 +280,7 @@ fun EnhancedHomeHeader(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Surface(
-                        onClick = { /* TODO: Shopping Cart */ },
+                        onClick = { onNavigateToCart() },
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surface,
                         modifier = Modifier.size(48.dp)
@@ -560,7 +573,8 @@ fun EnhancedPackageCard(
 fun TabletHomeScreen(
     uiState: HomeUiState,
     onPackageClick: (String) -> Unit,
-    onNavigateToSearch: () -> Unit
+    onNavigateToSearch: () -> Unit,
+    onNavigateToCart: () -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp

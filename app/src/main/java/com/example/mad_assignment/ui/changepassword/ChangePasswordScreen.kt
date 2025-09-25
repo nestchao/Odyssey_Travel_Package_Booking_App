@@ -33,16 +33,13 @@ fun ChangePasswordScreen(
     onNavigateBack: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current // Get context for the Toast
+    val context = LocalContext.current
 
-    // ADD THIS BLOCK to listen for events
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 is Event.ShowToastAndNavigateBack -> {
-                    // 1. Show the "pop-up" message
                     Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
-                    // 2. Go back to the settings screen
                     onNavigateBack()
                 }
             }
