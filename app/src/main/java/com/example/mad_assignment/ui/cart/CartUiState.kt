@@ -11,6 +11,8 @@ sealed interface CartUiState {
     data class Success(
         val cart: Cart? = null,
         val availableItems: List<CartItem> = emptyList(),
+        // ** ADD THIS NEW LIST **
+        val unavailableItems: List<CartItem> = emptyList(),
         val expiredItems: List<CartItem> = emptyList(),
         val selectedItemIds: Set<String> = emptySet(),
         val isEditingItem: Boolean = false,

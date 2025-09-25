@@ -154,7 +154,10 @@ fun AppNavigation(){
                 onBellClick = { navController.navigate("notifications") },
                 onSignOut = { navController.navigate("signin") { popUpTo(navController.graph.startDestinationId) { inclusive = true } } },
                 onNavigateToAccountDetails = { navController.navigate("account_detail") },
-                onNavigateToSettings = { navController.navigate("setting") },
+                // Pass lambdas for navigation *from* the settings screen
+                onNavigateToChangePassword = { navController.navigate("changePassword") },
+                onNavigateToAboutUs = { navController.navigate("aboutus") },
+                onNavigateToSettings = { navController.navigate("setting") }, // This is unused in tablet but kept for consistency
                 onNavigateToRecentlyViewed = { navController.navigate("recentlyViewed") },
                 onNavigateToWishlist = { navController.navigate("wishlist") },
                 onNavigateToCart = { navController.navigate("cart") },
@@ -190,13 +193,9 @@ fun AppNavigation(){
                 onBackClick = { navController.popBackStack() },
                 onPackageDetailsClick = { cartItem -> navController.navigate("detail/${cartItem.packageId}") },
                 onPackagesClick = { navController.navigate("home") },
-                // The signature here now provides the cartId AND the selected item IDs
                 onCheckoutClick = { cartId, selectedItemIds ->
-                    // Serialize the list of IDs into a JSON array string
                     val selectedItemIdsJson = Gson().toJson(selectedItemIds)
-                    // URL-encode the JSON string to make it safe for navigation
                     val encodedSelectedItemIds = java.net.URLEncoder.encode(selectedItemIdsJson, "UTF-8")
-
                     navController.navigate("checkout?cartId=$cartId&selectedItemIdsJson=$encodedSelectedItemIds")
                 }
             )
@@ -344,8 +343,6 @@ fun AppNavigation(){
             CheckoutScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onPaymentSuccess = {
-                    // After successful payment, navigate to a confirmation or home screen,
-                    // clearing the back stack to prevent going back to checkout.
                     navController.navigate(mainDestination) {
                         popUpTo(mainDestination) { inclusive = true }
                     }
@@ -364,12 +361,11 @@ private fun PhoneContainerScreen(
     onSignOut: () -> Unit,
     onNavigateToAccountDetails : () -> Unit,
     onNavigateToSettings : () -> Unit,
-    onBellClick: (String) -> Unit,
+    onBellClick: () -> Unit,
     onNavigateToWishlist: () -> Unit,
     onNavigateToRecentlyViewed: () -> Unit,
     onNavigateToCart: () -> Unit,
 ) {
-    val user by mainViewModel.currentUser.collectAsState()
     val contentNavController = rememberNavController()
 
     Scaffold(
@@ -385,7 +381,8 @@ private fun PhoneContainerScreen(
                 onNavigateToSearch = onNavigateToSearch,
                 onNavigateToManagement = onNavigateToManagement,
                 onBellClick = onBellClick,
-                onNavigateToCart = onNavigateToCart
+                onNavigateToCart = onNavigateToCart,
+                onNavigateToProfile = { contentNavController.navigate("profile") }
             )
 
             composable("profile") {
@@ -411,10 +408,13 @@ private fun TabletContainerScreen(
     onSignOut: () -> Unit,
     onNavigateToAccountDetails : () -> Unit,
     onNavigateToSettings : () -> Unit,
-    onBellClick: (String) -> Unit,
+    onBellClick: () -> Unit,
     onNavigateToWishlist: () -> Unit,
     onNavigateToRecentlyViewed: () -> Unit,
     onNavigateToCart: () -> Unit,
+    // Add these lambdas to handle navigation from the settings screen
+    onNavigateToChangePassword: () -> Unit,
+    onNavigateToAboutUs: () -> Unit,
 ) {
     val user by mainViewModel.currentUser.collectAsState()
     val contentNavController = rememberNavController()
@@ -438,10 +438,24 @@ private fun TabletContainerScreen(
                     onNavigateToSearch = onNavigateToSearch,
                     onNavigateToManagement = onNavigateToManagement,
                     onBellClick = onBellClick,
-                    onNavigateToCart = onNavigateToCart
+                    onNavigateToCart = onNavigateToCart,
+                    onNavigateToProfile = { contentNavController.navigate("profile") { launchSingleTop = true } }
                 )
-                composable("favorites") { PlaceholderScreen(screenName = "Favorites") }
-                composable("settings") { PlaceholderScreen(screenName = "Settings") }
+                composable("wishlist") {
+                    WishlistScreen(
+                        onNavigateBack = { contentNavController.popBackStack() },
+                        onPackageClick = onNavigateToDetail
+                    )
+                }
+                composable("settings") {
+                    val viewModel: SettingsViewModel = hiltViewModel()
+                    SettingsScreen(
+                        viewModel = viewModel,
+                        onNavigateToChangePassword = onNavigateToChangePassword,
+                        onNavigateToAboutUs = onNavigateToAboutUs,
+                        onNavigateBack = { contentNavController.popBackStack() },
+                    )
+                }
 
                 composable("profile") {
                     ProfileScreen(
@@ -456,6 +470,7 @@ private fun TabletContainerScreen(
             }
         }
     } else {
+        // Fallback to phone layout for portrait tablets
         PhoneContainerScreen(
             mainViewModel = mainViewModel,
             onNavigateToDetail = onNavigateToDetail,
@@ -476,8 +491,10 @@ private fun NavGraphBuilder.sharedAppGraph(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
     onNavigateToManagement: () -> Unit,
-    onBellClick: (String) -> Unit,
-    onNavigateToCart: () -> Unit
+    onBellClick: () -> Unit, // <<< FIX IS HERE
+    onNavigateToCart: () -> Unit,
+    // Add this to handle profile navigation from within the shared graph
+    onNavigateToProfile: () -> Unit,
 ) {
     composable("home") {
         HomeScreen(
@@ -485,7 +502,8 @@ private fun NavGraphBuilder.sharedAppGraph(
             onNavigateToSearch = onNavigateToSearch,
             onNavigateToManagement = onNavigateToManagement,
             onBellClick = onBellClick,
-            onNavigateToCart = onNavigateToCart
+            onNavigateToCart = onNavigateToCart,
+            onNavigateToProfile = onNavigateToProfile // Pass it down
         )
     }
     composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
@@ -509,7 +527,7 @@ private fun TabletSideNavigation(
         SideNavItem("Home", "home", Icons.Outlined.Home, Icons.Filled.Home),
         SideNavItem("Explore", "explore", Icons.Outlined.Explore, Icons.Filled.Explore),
         SideNavItem("Bookings", "bookings", Icons.Outlined.BookmarkBorder, Icons.Filled.Bookmark),
-        SideNavItem("Favorites", "favorites", Icons.Outlined.FavoriteBorder, Icons.Filled.Favorite),
+        SideNavItem("Wishlist", "wishlist", Icons.Outlined.FavoriteBorder, Icons.Filled.Favorite),
         SideNavItem("Profile", "profile", Icons.Outlined.Person, Icons.Filled.Person),
         SideNavItem("Settings", "settings", Icons.Outlined.Settings, Icons.Filled.Settings)
     )
@@ -528,7 +546,9 @@ private fun TabletSideNavigation(
                 .padding(16.dp)
         ) {
             Card(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                 ),
@@ -579,7 +599,9 @@ private fun TabletSideNavigation(
                             Color.Transparent
                     ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(

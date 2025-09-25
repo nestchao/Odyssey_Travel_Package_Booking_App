@@ -22,7 +22,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.mad_assignment.data.model.TravelPackage
+import com.example.mad_assignment.data.model.TravelPackageWithImages // Import this
+import coil.compose.AsyncImage // Import AsyncImage
+import coil.request.ImageRequest // Import ImageRequest
+import com.example.mad_assignment.util.toDataUri // Assuming this utility function exists from your other code
+import androidx.compose.ui.platform.LocalContext // Import LocalContext
+import androidx.compose.ui.layout.ContentScale // Import ContentScale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,7 +39,6 @@ fun RecentlyViewedScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showClearDialog by remember { mutableStateOf(false) }
 
-    // Refresh when the screen is composed or recomposed
     LaunchedEffect(Unit) {
         viewModel.loadRecentlyViewed()
     }
@@ -51,7 +55,7 @@ fun RecentlyViewedScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = {
-                        viewModel.loadRecentlyViewed() // Refresh before going back
+                        viewModel.loadRecentlyViewed()
                         onNavigateBack()
                     }) {
                         Icon(
@@ -61,7 +65,6 @@ fun RecentlyViewedScreen(
                     }
                 },
                 actions = {
-                    // Refresh button - always show
                     IconButton(
                         onClick = { viewModel.loadRecentlyViewed() }
                     ) {
@@ -72,7 +75,6 @@ fun RecentlyViewedScreen(
                         )
                     }
 
-                    // Clear button - only show when there are items
                     if (uiState is RecentlyViewedUiState.Success &&
                         (uiState as RecentlyViewedUiState.Success).recentlyViewedPackages.isNotEmpty()) {
                         IconButton(
@@ -118,16 +120,16 @@ fun RecentlyViewedScreen(
                             )
                         }
 
+                        // IMPORTANT: 'travelPackage' here is actually TravelPackageWithImages
                         items(
                             items = state.recentlyViewedPackages,
-                            key = { it.packageId }
-                        ) { travelPackage ->
+                            key = { it.travelPackage.packageId } // Access packageId from nested TravelPackage
+                        ) { travelPackageWithImages -> // Changed parameter name to reflect type
                             RecentlyViewedPackageCard(
-                                travelPackage = travelPackage,
+                                travelPackageWithImages = travelPackageWithImages, // Pass the TravelPackageWithImages object
                                 onClick = {
-                                    // Refresh before navigating to ensure latest data
                                     viewModel.loadRecentlyViewed()
-                                    onPackageClick(travelPackage.packageId)
+                                    onPackageClick(travelPackageWithImages.travelPackage.packageId) // Access packageId from nested TravelPackage
                                 }
                             )
                         }
@@ -149,7 +151,6 @@ fun RecentlyViewedScreen(
         }
     }
 
-    // Clear confirmation dialog
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
@@ -182,9 +183,14 @@ fun RecentlyViewedScreen(
 
 @Composable
 fun RecentlyViewedPackageCard(
-    travelPackage: TravelPackage,
+    travelPackageWithImages: TravelPackageWithImages, // IMPORTANT: Changed parameter type
     onClick: () -> Unit
 ) {
+    // Extract TravelPackage and primary image URL from TravelPackageWithImages
+    val travelPackage = travelPackageWithImages.travelPackage
+    val primaryImageUrl = travelPackageWithImages.images.firstOrNull()?.base64Data
+    val context = LocalContext.current // Get current context for ImageRequest
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -212,14 +218,26 @@ fun RecentlyViewedPackageCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                // If you have images, you can use AsyncImage here
-                // For now, showing a placeholder icon
-                Icon(
-                    Icons.Outlined.Image,
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                )
+                // If an image URL is available, use AsyncImage
+                if (!primaryImageUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(toDataUri(primaryImageUrl)) // Use toDataUri for Base64 images
+                            .crossfade(true) // Optional: add a crossfade animation
+                            .build(),
+                        contentDescription = travelPackage.packageName,
+                        contentScale = ContentScale.Crop, // Crop to fill the bounds
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    // Otherwise, show a placeholder icon
+                    Icon(
+                        Icons.Outlined.Image,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(16.dp))
@@ -282,7 +300,6 @@ fun RecentlyViewedPackageCard(
                             )
                         }
 
-                        // Price range
                         val minPrice = travelPackage.pricing.values.minOrNull() ?: 0.0
                         if (minPrice > 0) {
                             Text(

@@ -1,5 +1,6 @@
 package com.example.mad_assignment.ui.packagedetail
 
+import com.example.mad_assignment.data.model.ChatState
 import com.example.mad_assignment.data.model.DepartureAndEndTime
 import com.example.mad_assignment.data.model.TravelPackage
 import com.example.mad_assignment.data.model.Trip
@@ -13,7 +14,9 @@ sealed interface PackageDetailUiState {
         val itineraryTrips: Map<Int, List<Trip>> = emptyMap(),
         val departures: List<DepartureAndEndTime> = emptyList(),
         val selectedDeparture: DepartureAndEndTime? = null,
-        val paxCounts: Map<String, Int> = emptyMap()
+        val paxCounts: Map<String, Int> = emptyMap(),
+        val isChatVisible: Boolean = false,
+        val chatState: ChatState = ChatState()
     ) : PackageDetailUiState {
         val totalPrice: Double
             get() {

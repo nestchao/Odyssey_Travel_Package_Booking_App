@@ -1,40 +1,42 @@
 package com.example.mad_assignment.ui.packagedetail
 
 import android.util.Log
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mad_assignment.data.model.CartItem
+import com.example.mad_assignment.data.model.ChatMessage
 import com.example.mad_assignment.data.model.DepartureAndEndTime
 import com.example.mad_assignment.data.repository.CartRepository
-import com.example.mad_assignment.data.repository.PaymentRepository
-import com.example.mad_assignment.data.repository.TravelPackageRepository
 import com.example.mad_assignment.data.repository.RecentlyViewedRepository
+import com.example.mad_assignment.data.repository.TravelPackageRepository
 import com.example.mad_assignment.data.repository.WishlistRepository
+import com.example.mad_assignment.di.AppModule
+import com.google.ai.client.generativeai.GenerativeModel
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class PackageDetailViewModel @Inject constructor(
     private val packageRepository: TravelPackageRepository,
-    private val paymentRepository: PaymentRepository,
+    // Note: paymentRepository is unused here and can be safely removed if not needed for future features.
+    // private val paymentRepository: PaymentRepository,
     private val cartRepository: CartRepository,
     private val wishlistRepository: WishlistRepository,
     private val recentlyViewedRepository: RecentlyViewedRepository,
     private val auth: FirebaseAuth,
+    private val generativeModel: GenerativeModel,
+    private val gson: Gson,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -42,6 +44,9 @@ class PackageDetailViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow<PackageDetailUiState>(PackageDetailUiState.Loading)
     val uiState: StateFlow<PackageDetailUiState> = _uiState.asStateFlow()
+
+    private val _isInWishlist = MutableStateFlow(false)
+    val isInWishlist: StateFlow<Boolean> = _isInWishlist.asStateFlow()
 
     init {
         Log.d("PackageDetailVM", "Initializing with packageId: $packageId")
@@ -52,6 +57,91 @@ class PackageDetailViewModel @Inject constructor(
         } else {
             Log.e("PackageDetailVM", "Package ID is null")
             _uiState.value = PackageDetailUiState.Error("Package ID not provided")
+        }
+    }
+
+    fun showChat(show: Boolean) {
+        _uiState.update {
+            if (it is PackageDetailUiState.Success) {
+                it.copy(isChatVisible = show)
+            } else it
+        }
+    }
+
+    fun onChatPromptChanged(newPrompt: String) {
+        _uiState.update {
+            if (it is PackageDetailUiState.Success) {
+                it.copy(chatState = it.chatState.copy(prompt = newPrompt))
+            } else it
+        }
+    }
+
+    fun sendChatMessage(promptFromUser: String) {
+        val currentState = _uiState.value
+        if (currentState !is PackageDetailUiState.Success) return
+        if (promptFromUser.isBlank()) return
+
+        // Add user message to UI immediately
+        val userMessage = ChatMessage(text = promptFromUser, isFromUser = true)
+        _uiState.update {
+            (it as PackageDetailUiState.Success).let { successState ->
+                successState.copy(
+                    chatState = successState.chatState.copy(
+                        messages = successState.chatState.messages + userMessage,
+                        prompt = "", // Clear input field
+                        isLoading = true
+                    )
+                )
+            }
+        }
+
+        viewModelScope.launch {
+            try {
+                // *** THE MAGIC: CONSTRUCT THE CONTEXT-AWARE PROMPT ***
+                val packageJson = gson.toJson(currentState.packageDetail.travelPackage)
+                val fullPrompt = """
+                    You are a friendly and helpful travel assistant for the 'Odyssey' travel agency.
+                    Your task is to answer questions about a specific travel package.
+                    Use ONLY the information provided in the following JSON data. Do not make up information.
+                    If the user asks a question that cannot be answered from the data, politely say that you don't have that specific information.
+
+                    PACKAGE DATA:
+                    $packageJson
+
+                    USER'S QUESTION:
+                    "$promptFromUser"
+                """.trimIndent()
+
+                // This line will now compile and work correctly!
+                val response = generativeModel.generateContent(fullPrompt)
+                val aiResponse = response.text ?: "Sorry, I couldn't process that. Please try again."
+
+                // Add AI response to UI
+                val aiMessage = ChatMessage(text = aiResponse, isFromUser = false)
+                _uiState.update {
+                    (it as PackageDetailUiState.Success).let { successState ->
+                        successState.copy(
+                            chatState = successState.chatState.copy(
+                                messages = successState.chatState.messages + aiMessage,
+                                isLoading = false
+                            )
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "Error generating content", e)
+                val errorMessage = ChatMessage("Error: ${e.message}", isFromUser = false)
+                _uiState.update {
+                    (it as PackageDetailUiState.Success).let { successState ->
+                        successState.copy(
+                            chatState = successState.chatState.copy(
+                                messages = successState.chatState.messages + errorMessage,
+                                isLoading = false
+                            )
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -88,7 +178,6 @@ class PackageDetailViewModel @Inject constructor(
                             packageRepository.getDepartureDates(packageId)
                         } catch (e: Exception) {
                             Log.e("PackageDetailVM", "Error loading departures", e)
-                            // Return the package options from the travel package itself as fallback
                             packageDetailData.travelPackage.packageOption
                         }
                     }
@@ -98,7 +187,6 @@ class PackageDetailViewModel @Inject constructor(
 
                     Log.d("PackageDetailVM", "Loaded ${departures.size} departure dates")
 
-                    // Initialize pax counts with pricing categories set to 0
                     val initialPaxCounts = packageDetailData.travelPackage.pricing.keys.associateWith { 0 }
 
                     _uiState.value = PackageDetailUiState.Success(
@@ -119,7 +207,28 @@ class PackageDetailViewModel @Inject constructor(
         _uiState.update { currentState ->
             if (currentState is PackageDetailUiState.Success) {
                 Log.d("PackageDetailVM", "Selected departure: ${departure.id}")
-                currentState.copy(selectedDeparture = departure)
+
+                val availableCapacity = departure.capacity - departure.numberOfPeopleBooked
+                val currentTotalTravelers = currentState.paxCounts.values.sum()
+
+                // ** CHANGED LOGIC **
+                // If the user's current traveler count is more than the newly selected
+                // date's capacity, we automatically reduce the count to the maximum available.
+                // This is a much better user experience than just blocking the selection.
+                if (currentTotalTravelers > availableCapacity) {
+                    val adjustedPaxCounts = currentState.paxCounts.toMutableMap()
+                    // Set adults to the max available spots and reset children to simplify.
+                    adjustedPaxCounts["Adult"] = availableCapacity.coerceAtLeast(0)
+                    adjustedPaxCounts["Child"] = 0
+
+                    currentState.copy(
+                        selectedDeparture = departure,
+                        paxCounts = adjustedPaxCounts
+                    )
+                } else {
+                    // If capacity is sufficient, just update the selected date.
+                    currentState.copy(selectedDeparture = departure)
+                }
             } else {
                 currentState
             }
@@ -129,11 +238,25 @@ class PackageDetailViewModel @Inject constructor(
     fun updatePaxCount(category: String, change: Int) {
         _uiState.update { currentState ->
             if (currentState is PackageDetailUiState.Success) {
+                // ** CHANGED LOGIC **
+                // 1. Force the user to select a date FIRST. If no date is selected, do nothing.
+                // This is the primary fix for the overbooking bug.
+                val selectedDeparture = currentState.selectedDeparture ?: return@update currentState
+
                 val currentPaxCounts = currentState.paxCounts.toMutableMap()
                 val currentCount = currentPaxCounts[category] ?: 0
                 val newCount = (currentCount + change).coerceAtLeast(0)
 
+                // 2. Now that we know a date is selected, perform the capacity check.
+                val potentialTotalTravelers = currentState.paxCounts.values.sum() - currentCount + newCount
+                val availableCapacity = selectedDeparture.capacity - selectedDeparture.numberOfPeopleBooked
 
+                if (availableCapacity < potentialTotalTravelers) {
+                    Log.w("PackageDetailVM", "Cannot update pax count: insufficient capacity. Available: $availableCapacity, Requested: $potentialTotalTravelers")
+                    return@update currentState // Capacity check failed, so we don't update the state.
+                }
+
+                // 3. If the capacity check passes, update the state.
                 currentPaxCounts[category] = newCount
                 Log.d("PackageDetailVM", "Updated pax count for $category: $newCount")
 
@@ -143,6 +266,7 @@ class PackageDetailViewModel @Inject constructor(
             }
         }
     }
+
 
     fun addToCart() {
         viewModelScope.launch {
@@ -156,7 +280,6 @@ class PackageDetailViewModel @Inject constructor(
             val userId = getCurrentUserId()
             if (userId == null) {
                 Log.e("AddToCart", "User is not logged in.")
-                // Here you might want to emit an event to the UI to show a login prompt
                 return@launch
             }
             if (packageId == null) {
@@ -174,11 +297,21 @@ class PackageDetailViewModel @Inject constructor(
                 return@launch
             }
 
+            // ** CHANGED LOGIC **
+            // Add a final "belt-and-suspenders" safety check. The UI logic should prevent
+            // this from ever being hit, but it's good practice for data integrity.
+            val availableCapacity = selectedDeparture.capacity - selectedDeparture.numberOfPeopleBooked
+            if (availableCapacity < totalTravelers) {
+                Log.e("AddToCart", "FATAL: Attempted to add to cart with insufficient capacity. This should have been caught by the UI logic.")
+                // You could show a final error Toast to the user here.
+                return@launch
+            }
+
             // Create the CartItem object
             val cartItem = CartItem(
                 packageId = packageId,
                 departureId = selectedDeparture.id,
-                basePrice = currentState.totalPrice, // Base price is the calculated total for this booking
+                basePrice = currentState.totalPrice,
                 totalPrice = currentState.totalPrice,
                 noOfAdults = currentState.paxCounts["Adult"] ?: 0,
                 noOfChildren = currentState.paxCounts["Child"] ?: 0,
@@ -188,20 +321,15 @@ class PackageDetailViewModel @Inject constructor(
                 durationDays = currentState.packageDetail.travelPackage.durationDays,
                 addedAt = Timestamp.now(),
                 updatedAt = Timestamp.now(),
-                // Set an expiry time, e.g., 7 days from now
                 expiresAt = Timestamp(System.currentTimeMillis() / 1000 + 86400 * 7, 0),
                 available = true
             )
 
             try {
-                // Get the user's existing cart or null if it doesn't exist
                 val userCart = cartRepository.getCartByUserId(userId).getOrNull()
-
-                // Add item to cart (this will create a new cart if one doesn't exist)
                 val result = cartRepository.addItemToCart(userId, userCart?.cartId, cartItem)
                 if (result.isSuccess) {
                     Log.d("AddToCart", "Successfully added item to cart. New item ID: ${result.getOrNull()}")
-                    // Optionally, you can emit a success event to the UI here
                 } else {
                     Log.e("AddToCart", "Failed to add item to cart", result.exceptionOrNull())
                 }
@@ -211,22 +339,6 @@ class PackageDetailViewModel @Inject constructor(
         }
     }
 
-    /*
-     TODO: add function to pass the value to cart
-     fun addToCart(){
-        val cartItem = CartItem(
-            packageId = packageId,
-            departureDate = (uiState.value as? PackageDetailUiState.Success)?.selectedDeparture,
-            paxCounts = (uiState.value as? PackageDetailUiState.Success)?.paxCounts ?: emptyMap(),
-            totalPrice = (uiState.value as? PackageDetailUiState.Success)?.totalPrice ?: 0.0
-        )
-        // Add to cart repository
-     }
-     */
-
-    private val _isInWishlist = MutableStateFlow(false)
-    val isInWishlist: StateFlow<Boolean> = _isInWishlist.asStateFlow()
-
     private fun getCurrentUserId(): String? {
         return auth.currentUser?.uid
     }
@@ -234,8 +346,6 @@ class PackageDetailViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val userId = getCurrentUserId()
-                Log.d("DEBUG", "UserID: $userId, PackageID: $packageId")
-
                 if (userId == null) {
                     Log.e("DEBUG", "USER ID IS NULL - THIS IS CREATING NULL DOCUMENT!")
                     return@launch
@@ -274,14 +384,12 @@ class PackageDetailViewModel @Inject constructor(
 
                     if (isCurrentlyInWishlist) {
                         val wishlistItem = wishlistRepository.getWishlistItemByPackageId(currentUserId, it)
-//                        val wishlistItemId = wishlistRepository.getWishlistItemId(currentUserId, it)
                         wishlistItem?.let { item ->
                             wishlistRepository.removeFromWishlist(currentUserId, item.id)
                             Log.d("PackageDetailVM", "Removed from wishlist: $it")
                             _isInWishlist.value = false
                         }
                     } else {
-                        // Add to wishlist
                         wishlistRepository.addToWishlist(currentUserId, it)
                         Log.d("PackageDetailVM", "Added to wishlist: $it")
                         _isInWishlist.value = true

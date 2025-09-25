@@ -73,7 +73,8 @@ class BookingDataSource @Inject constructor(
                     val departureOption = travelPackage.packageOption.find { it.id == cartItem.departureId }
                         ?: throw FirebaseFirestoreException("Departure option with ID ${cartItem.departureId} not found in package.", FirebaseFirestoreException.Code.NOT_FOUND)
 
-                    val availableCapacity = departureOption.capacity - departureOption.bookedCount
+                    // IMPORTANT: Use numberOfPeopleBooked here
+                    val availableCapacity = departureOption.capacity - departureOption.numberOfPeopleBooked
                     if (availableCapacity < cartItem.totalTravelerCount) {
                         throw FirebaseFirestoreException("Insufficient capacity for package ${cartItem.packageId}", FirebaseFirestoreException.Code.ABORTED)
                     }
@@ -107,7 +108,8 @@ class BookingDataSource @Inject constructor(
                         val optionIndex = updatedOptions.indexOfFirst { it.id == cartItem.departureId }
                         if (optionIndex != -1) {
                             val oldOption = updatedOptions[optionIndex]
-                            updatedOptions[optionIndex] = oldOption.copy(bookedCount = oldOption.bookedCount + cartItem.totalTravelerCount)
+                            // IMPORTANT: Update numberOfPeopleBooked with totalTravelerCount
+                            updatedOptions[optionIndex] = oldOption.copy(numberOfPeopleBooked = oldOption.numberOfPeopleBooked + cartItem.totalTravelerCount)
                         }
                     }
                     transaction.update(packageRef, "packageOption", updatedOptions)
@@ -241,18 +243,23 @@ class BookingDataSource @Inject constructor(
                 // Handle refund logic for cancelled paid bookings
                 if (booking.status == BookingStatus.PAID && newStatus == BookingStatus.CANCELLED) {
                     // TODO: payment module process refund
+                    // ALSO: If this cancellation is successful and a refund is issued,
+                    // you would typically want to release the capacity back to the package.
+                    // This involves finding the associated DepartureAndEndTime and
+                    // decrementing its numberOfPeopleBooked by booking.totalTravelerCount.
                     transaction.update(
                         bookingRef,
                         "status", BookingStatus.REFUNDED.name,
                         "updatedAt", Timestamp.now()
                     )
+                } else {
+                    // Only update status if it's not a paid -> cancelled flow leading to REFUNDED
+                    transaction.update(
+                        bookingRef,
+                        "status", newStatus.name,
+                        "updatedAt", Timestamp.now()
+                    )
                 }
-
-                transaction.update(
-                    bookingRef,
-                    "status", newStatus.name,
-                    "updatedAt", Timestamp.now()
-                )
             }.await().let { Result.success(Unit) }
         } catch (e: Exception) {
             Log.e(TAG, "updateBookingStatus failed", e)
@@ -269,13 +276,16 @@ class BookingDataSource @Inject constructor(
                     ?: throw Exception("Booking not found.")
 
                 // check if booking can be cancelled
-                if (booking.status == BookingStatus.COMPLETED || booking.status == BookingStatus.CANCELLED) {
+                if (booking.status == BookingStatus.COMPLETED || booking.status == BookingStatus.CANCELLED || booking.status == BookingStatus.REFUNDED) {
                     throw Exception("Cannot cancel booking with status: ${booking.status}")
                 }
 
-                val newStatus = if (booking.status == BookingStatus.PAID) {
-                    // TODO: payment module process refund
-                    BookingStatus.CANCELLED
+                val newStatus = if (booking.status == BookingStatus.PAID || booking.status == BookingStatus.CONFIRMED) {
+                    // TODO: payment module process refund (this would be where the `numberOfPeopleBooked` is decremented)
+                    // If a refund is processed, the status might go to REFUNDED
+                    // For now, setting to CANCELLED and leaving a note for capacity adjustment
+                    // You would need to add a `departureId` to your `Booking` model to make this work seamlessly.
+                    BookingStatus.CANCELLED // Or REFUNDED if payment is processed
                 } else {
                     BookingStatus.CANCELLED
                 }
@@ -292,6 +302,7 @@ class BookingDataSource @Inject constructor(
         }
     }
 
+    // *** NEW FUNCTION ADDED HERE ***
     suspend fun completeBooking(bookingId: String): Result<Unit> {
         return try {
             firestore.runTransaction { transaction ->
@@ -321,7 +332,7 @@ class BookingDataSource @Inject constructor(
         return try {
             val now = Timestamp.now()
             val querySnapshot = firestore.collection(BOOKINGS_COLLECTION)
-                .whereLessThan("departureDate", now)
+                .whereLessThan("startBookingDate", now) // Changed from "departureDate"
                 .whereIn("status", listOf(BookingStatus.PAID.name, BookingStatus.CONFIRMED.name))
                 .get()
                 .await()
@@ -369,14 +380,16 @@ class BookingDataSource @Inject constructor(
 
                 val updatedPackageOptions = travelPackage.packageOption.map { option ->
                     if (option.id == departureId) {
-                        val availableCapacity = option.capacity - option.bookedCount
+                        // IMPORTANT: Use numberOfPeopleBooked here
+                        val availableCapacity = option.capacity - option.numberOfPeopleBooked
                         if (availableCapacity < travelerCount) {
                             throw FirebaseFirestoreException(
                                 "Insufficient capacity. Available: $availableCapacity, Requested: $travelerCount",
                                 FirebaseFirestoreException.Code.ABORTED
                             )
                         }
-                        option.copy(bookedCount = option.bookedCount + travelerCount)
+                        // IMPORTANT: Update numberOfPeopleBooked
+                        option.copy(numberOfPeopleBooked = option.numberOfPeopleBooked + travelerCount)
                     } else {
                         option
                     }
