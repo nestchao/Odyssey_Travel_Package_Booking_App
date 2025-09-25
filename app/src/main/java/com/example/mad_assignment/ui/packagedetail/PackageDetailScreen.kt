@@ -105,24 +105,13 @@ fun PackageDetailScreen(
     onNavigateBack: () -> Unit,
     onNavigateToCart: () -> Unit,
     onNavigateToCheckout: (packageId: String, departureId: String, paxCountsJson: String) -> Unit,
-) {
+    ) {
     val viewModel: PackageDetailViewModel = hiltViewModel()
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        // REMOVED: ExtendedFloatingActionButton from here
-        // floatingActionButton = {
-        //     // Only show the button when the data has successfully loaded
-        //     if (uiState is PackageDetailUiState.Success) {
-        //         ExtendedFloatingActionButton(
-        //             onClick = { viewModel.showChat(true) },
-        //             icon = { Icon(Icons.Default.Chat, contentDescription = "AI Assistant") },
-        //             text = { Text("Assistant") }
-        //         )
-        //     }
-        // }
     ) { paddingValues ->
         Box(modifier = Modifier
             .fillMaxSize()
@@ -161,7 +150,6 @@ fun PackageDetailScreen(
                             .asPaddingValues()
                     ) {
                         item {
-                            // Pass the chat visibility callback to the header
                             EnhancedImageHeader(
                                 packageDetail = state.packageDetail,
                                 onNavigateBack = onNavigateBack,
