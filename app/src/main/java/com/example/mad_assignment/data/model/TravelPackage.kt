@@ -16,11 +16,11 @@ data class TravelPackage(
     val status: PackageStatus = PackageStatus.AVAILABLE,
     val createdAt: Timestamp?= null,
     val deletedAt: Timestamp? = null
-)
-
-enum class PackageStatus{
-    AVAILABLE,
-    SOLD_OUT,
-    CANCELLED,
-    EXPIRED
+) {
+    enum class PackageStatus {
+        AVAILABLE,
+        SOLD_OUT,
+        CANCELLED,
+        EXPIRED
+    }
 }

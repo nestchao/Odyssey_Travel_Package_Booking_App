@@ -3,6 +3,7 @@ package com.example.mad_assignment.ui.home
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.mad_assignment.data.model.TravelPackageWithImages
 import com.example.mad_assignment.data.repository.TravelPackageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -18,6 +19,8 @@ class HomeViewModel @Inject constructor(
     private val travelPackageRepository: TravelPackageRepository
 ) : ViewModel() {
 
+    private var isUserAdmin: Boolean = true
+
     val uiState: StateFlow<HomeUiState> =
         travelPackageRepository.getTravelPackagesWithImages()
             .onStart {
@@ -25,7 +28,10 @@ class HomeViewModel @Inject constructor(
             }
             .map<List<TravelPackageWithImages>, HomeUiState> { packagesWithImages ->
                 Log.d("HomeViewModel", "Successfully loaded ${packagesWithImages.size} packages")
-                HomeUiState.Success(packagesWithImages)
+                HomeUiState.Success(
+                    packages = packagesWithImages,
+                    isAdmin = isUserAdmin
+                    )
             }
             .catch { exception ->
                 Log.e("HomeViewModel", "Error loading packages", exception)

@@ -37,87 +37,94 @@ class BookingDataSource @Inject constructor(
     suspend fun createBookingsFromCart(
         userId: String,
         cartId: String,
-        cartItems: List<CartItem>
+        cartItems: List<CartItem>,
+        paymentId: String
     ): Result<List<String>> {
+        if (cartItems.isEmpty()) {
+            return Result.failure(RuntimeException("No cart items to process."))
+        }
+
         return try {
+            val priceOfBookedItems = cartItems.sumOf { it.totalPrice }
+
             firestore.runTransaction { transaction ->
-                val bookingIds = mutableListOf<String>()
+                val bookedItemIds = cartItems.map { it.cartItemId }.toSet()
+
+                // PHASE 1: ALL READS AND PRE-FLIGHT CHECKS
+                val cartRef = firestore.collection(CARTS_COLLECTION).document(cartId)
+                val cartSnapshot = transaction.get(cartRef)
+                val currentCart = cartSnapshot.toObject(com.example.mad_assignment.data.model.Cart::class.java)
+                    ?: throw FirebaseFirestoreException("Cart not found during update.", FirebaseFirestoreException.Code.NOT_FOUND)
+
+                val cartItemsByPackage = cartItems.groupBy { it.packageId }
+                val packageDataMap = mutableMapOf<String, TravelPackage>()
+
+                for (packageId in cartItemsByPackage.keys) {
+                    val packageRef = firestore.collection(PACKAGES_COLLECTION).document(packageId)
+                    val packageDoc = transaction.get(packageRef)
+                    if (!packageDoc.exists()) {
+                        throw FirebaseFirestoreException("Package not found: $packageId", FirebaseFirestoreException.Code.NOT_FOUND)
+                    }
+                    packageDataMap[packageId] = packageDoc.toObject(TravelPackage::class.java)!!
+                }
 
                 for (cartItem in cartItems) {
-                    val packageRef = firestore.collection(PACKAGES_COLLECTION).document(cartItem.packageId)
-                    val packageDoc = transaction.get(packageRef)
+                    val travelPackage = packageDataMap[cartItem.packageId]!!
+                    val departureOption = travelPackage.packageOption.find { it.id == cartItem.departureId }
+                        ?: throw FirebaseFirestoreException("Departure option with ID ${cartItem.departureId} not found in package.", FirebaseFirestoreException.Code.NOT_FOUND)
 
-                    if (!packageDoc.exists()) {
-                        throw FirebaseFirestoreException("Package not found.", FirebaseFirestoreException.Code.NOT_FOUND)
-                    }
-
-                    val travelPackage = packageDoc.toObject(TravelPackage::class.java)
-                        ?: throw FirebaseFirestoreException("Invalid package data.", FirebaseFirestoreException.Code.DATA_LOSS)
-
-                    val departureOption = travelPackage.packageOption.find {
-                        it.startDate == cartItem.startDate && it.endDate == cartItem.endDate
-                    } ?: throw FirebaseFirestoreException("Departure option not found for the selected dates.", FirebaseFirestoreException.Code.NOT_FOUND)
-
-                    // check capacity
                     val availableCapacity = departureOption.capacity - departureOption.bookedCount
                     if (availableCapacity < cartItem.totalTravelerCount) {
-                        throw FirebaseFirestoreException(
-                            "Insufficient capacity. Available: $availableCapacity, Requested: ${cartItem.totalTravelerCount}",
-                            FirebaseFirestoreException.Code.ABORTED
-                        )
+                        throw FirebaseFirestoreException("Insufficient capacity for package ${cartItem.packageId}", FirebaseFirestoreException.Code.ABORTED)
                     }
                 }
 
-                // create bookings and update capacity
+                // PHASE 2: ALL WRITES
+                val bookingIds = mutableListOf<String>()
+
+                // 1. Create all booking documents
                 for (cartItem in cartItems) {
-                    // Create booking document
                     val newBookingRef = firestore.collection(BOOKINGS_COLLECTION).document()
                     val newBooking = Booking(
-                        bookingId = newBookingRef.id,
-                        userId = userId,
-                        packageId = cartItem.packageId,
-                        noOfAdults = cartItem.noOfAdults,
-                        noOfChildren = cartItem.noOfChildren,
-                        totalTravelerCount = cartItem.totalTravelerCount,
-                        subtotal = cartItem.basePrice,
-                        totalAmount = cartItem.totalPrice,
-                        startBookingDate = cartItem.startDate,
-                        endBookingDate = cartItem.endDate,
-                        createdAt = Timestamp.now(),
-                        updatedAt = Timestamp.now(),
-                        status = BookingStatus.CONFIRMED
+                        bookingId = newBookingRef.id, userId = userId, packageId = cartItem.packageId,
+                        paymentId = paymentId, noOfAdults = cartItem.noOfAdults,
+                        noOfChildren = cartItem.noOfChildren, totalTravelerCount = cartItem.totalTravelerCount,
+                        subtotal = cartItem.basePrice, totalAmount = cartItem.totalPrice,
+                        startBookingDate = cartItem.startDate, endBookingDate = cartItem.endDate,
+                        createdAt = Timestamp.now(), updatedAt = Timestamp.now(), status = BookingStatus.PAID
                     )
                     transaction.set(newBookingRef, newBooking)
                     bookingIds.add(newBookingRef.id)
-
-                    // Update the package option's booked count
-                    val packageRef = firestore.collection(PACKAGES_COLLECTION).document(cartItem.packageId)
-                    val packageDoc = transaction.get(packageRef)
-                    val travelPackage = packageDoc.toObject(TravelPackage::class.java)!!
-
-                    val updatedPackageOptions = travelPackage.packageOption.map { option ->
-                        if (option.startDate == cartItem.startDate && option.endDate == cartItem.endDate) {
-                            option.copy(bookedCount = option.bookedCount + cartItem.totalTravelerCount)
-                        } else {
-                            option
-                        }
-                    }
-
-                    transaction.update(packageRef, "packageOption", updatedPackageOptions)
                 }
 
-                // Clear cart
-                val cartRef = firestore.collection(CARTS_COLLECTION).document(cartId)
-                transaction.update(
-                    cartRef,
-                    "cartItemIds", emptyList<String>(),
-                    "totalAmount", 0.0,
-                    "finalAmount", 0.0,
-                    "updatedAt", Timestamp.now(),
-                    "isValid", false
-                )
+                // 2. Update all package capacities
+                for ((pkgId, itemsInPackage) in cartItemsByPackage) {
+                    val packageRef = firestore.collection(PACKAGES_COLLECTION).document(pkgId)
+                    val originalPackage = packageDataMap[pkgId]!!
+                    val updatedOptions = originalPackage.packageOption.toMutableList()
 
-                // Delete cart items
+                    for (cartItem in itemsInPackage) {
+                        val optionIndex = updatedOptions.indexOfFirst { it.id == cartItem.departureId }
+                        if (optionIndex != -1) {
+                            val oldOption = updatedOptions[optionIndex]
+                            updatedOptions[optionIndex] = oldOption.copy(bookedCount = oldOption.bookedCount + cartItem.totalTravelerCount)
+                        }
+                    }
+                    transaction.update(packageRef, "packageOption", updatedOptions)
+                }
+
+                // 3. Update the cart document
+                val remainingItemIds = currentCart.cartItemIds.filter { it !in bookedItemIds }
+                val newTotalAmount = currentCart.totalAmount - priceOfBookedItems
+                transaction.update(cartRef, mapOf(
+                    "cartItemIds" to remainingItemIds,
+                    "totalAmount" to newTotalAmount.coerceAtLeast(0.0),
+                    "finalAmount" to newTotalAmount.coerceAtLeast(0.0),
+                    "updatedAt" to Timestamp.now(),
+                    "isValid" to remainingItemIds.isNotEmpty()
+                ))
+
+                // 4. Delete the individual cart item documents
                 for (cartItem in cartItems) {
                     val cartItemRef = firestore.collection(CART_ITEMS_COLLECTION).document(cartItem.cartItemId)
                     transaction.delete(cartItemRef)
@@ -126,7 +133,7 @@ class BookingDataSource @Inject constructor(
                 bookingIds
             }.await().let { Result.success(it) }
         } catch (e: Exception) {
-            Log.e(TAG, "createBookingsFromCart failed for userId: $userId, cartId: $cartId", e)
+            Log.e(TAG, "createBookingsFromCart failed", e)
             Result.failure(RuntimeException("Failed to create bookings from cart", e))
         }
     }
@@ -310,7 +317,6 @@ class BookingDataSource @Inject constructor(
         }
     }
 
-    // called when scheduled job is triggered
     suspend fun completePastBookings(): Result<Unit> {
         return try {
             val now = Timestamp.now()
@@ -342,6 +348,54 @@ class BookingDataSource @Inject constructor(
         } catch (e: Exception) {
             Log.e(TAG, "completePastBookings failed", e)
             Result.failure(RuntimeException("Failed to complete past bookings", e))
+        }
+    }
+
+    suspend fun createBookingFromDirectPurchase(
+        newBooking: Booking,
+        packageId: String,
+        departureId: String,
+        travelerCount: Int
+    ): Result<String> {
+        return try {
+            firestore.runTransaction { transaction ->
+                val packageRef = firestore.collection(PACKAGES_COLLECTION).document(packageId)
+                val packageDoc = transaction.get(packageRef)
+
+                if (!packageDoc.exists()) {
+                    throw FirebaseFirestoreException("Package not found.", FirebaseFirestoreException.Code.NOT_FOUND)
+                }
+                val travelPackage = packageDoc.toObject(TravelPackage::class.java)!!
+
+                val updatedPackageOptions = travelPackage.packageOption.map { option ->
+                    if (option.id == departureId) {
+                        val availableCapacity = option.capacity - option.bookedCount
+                        if (availableCapacity < travelerCount) {
+                            throw FirebaseFirestoreException(
+                                "Insufficient capacity. Available: $availableCapacity, Requested: $travelerCount",
+                                FirebaseFirestoreException.Code.ABORTED
+                            )
+                        }
+                        option.copy(bookedCount = option.bookedCount + travelerCount)
+                    } else {
+                        option
+                    }
+                }
+
+                if (travelPackage.packageOption.none { it.id == departureId }) {
+                    throw FirebaseFirestoreException("Departure option not found for the selected dates.", FirebaseFirestoreException.Code.NOT_FOUND)
+                }
+
+                val newBookingRef = firestore.collection(BOOKINGS_COLLECTION).document(newBooking.bookingId)
+                transaction.set(newBookingRef, newBooking)
+
+                transaction.update(packageRef, "packageOption", updatedPackageOptions)
+
+                newBooking.bookingId
+            }.await().let { Result.success(it) }
+        } catch (e: Exception) {
+            Log.e(TAG, "createBookingFromDirectPurchase failed", e)
+            Result.failure(RuntimeException("Failed to create booking from direct purchase.", e))
         }
     }
 }

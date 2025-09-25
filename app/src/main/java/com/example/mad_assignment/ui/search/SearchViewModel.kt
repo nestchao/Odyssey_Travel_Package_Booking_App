@@ -2,9 +2,9 @@ package com.example.mad_assignment.ui.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.mad_assignment.data.model.TravelPackageWithImages
 import com.example.mad_assignment.data.repository.TravelPackageRepository
 import com.example.mad_assignment.ui.home.HomeUiState
-import com.example.mad_assignment.ui.home.TravelPackageWithImages
 import com.google.firebase.Timestamp
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*

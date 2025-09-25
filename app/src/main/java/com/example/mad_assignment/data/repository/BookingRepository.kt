@@ -24,9 +24,10 @@ class BookingRepository @Inject constructor(
     suspend fun createBookingsFromCart(
         userId: String,
         cartId: String,
-        cartItems: List<CartItem>
+        cartItems: List<CartItem>,
+        paymentId: String //
     ): Result<List<String>> {
-        return bookingDataSource.createBookingsFromCart(userId, cartId, cartItems)
+        return bookingDataSource.createBookingsFromCart(userId, cartId, cartItems, paymentId)
             .onFailure { Log.e(TAG, "createBookingsFromCart failed", it) }
     }
 
@@ -89,5 +90,15 @@ class BookingRepository @Inject constructor(
     suspend fun completePastBookings(): Result<Unit> {
         return bookingDataSource.completePastBookings()
             .onFailure { Log.e(TAG, "completePastBookings failed", it) }
+    }
+
+    suspend fun createBookingFromDirectPurchase(
+        newBooking: Booking,
+        packageId: String,
+        departureId: String,
+        travelerCount: Int
+    ): Result<String> {
+        return bookingDataSource.createBookingFromDirectPurchase(newBooking, packageId, departureId, travelerCount)
+            .onFailure { Log.e(TAG, "createBookingFromDirectPurchase failed", it) }
     }
 }

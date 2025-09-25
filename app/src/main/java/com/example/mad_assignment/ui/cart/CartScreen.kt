@@ -1,4 +1,3 @@
-
 package com.example.mad_assignment.ui.cart
 
 import androidx.compose.foundation.background
@@ -35,6 +34,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.mad_assignment.data.model.CartItem
 import com.example.mad_assignment.data.model.TravelPackage
+import com.example.mad_assignment.data.model.TravelPackageWithImages
+import com.example.mad_assignment.ui.home.TravelPackageWithImages
 import com.example.mad_assignment.ui.packagedetail.PackageDetailData
 import com.example.mad_assignment.util.toDataUri
 import com.google.firebase.Timestamp
@@ -47,7 +48,7 @@ fun CartScreen(
     onBackClick: () -> Unit = {},
     onPackageDetailsClick: (CartItem) -> Unit,
     onPackagesClick: () -> Unit,
-    onCheckoutClick: (List<CartItem>) -> Unit
+    onCheckoutClick: (cartId: String, selectedItemIds: List<String>) -> Unit
 ) {
     val viewModel: CartViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -93,9 +94,11 @@ fun CartScreen(
             if (uiState is CartUiState.Success) {
                 CheckoutBar(
                     state = uiState as CartUiState.Success,
-                    onCheckoutClick = { selectedItems ->
-                        onCheckoutClick(selectedItems)
-                        viewModel.proceedToCheckout()
+                    onCheckoutClick = {
+                        val state = (uiState as CartUiState.Success)
+                        state.cart?.cartId?.let { cartId ->
+                            onCheckoutClick(cartId, state.selectedItemIds.toList())
+                        }
                     }
                 )
             }
@@ -650,7 +653,7 @@ private fun CartContent(
 @Composable
 private fun CartItemCard(
     cartItem: CartItem,
-    packageDetails: PackageDetailData?,
+    packageDetails: TravelPackageWithImages?,
     isSelected: Boolean,
     onPackageDetailsClick: () -> Unit,
     onQuickViewClick: () -> Unit,
@@ -870,7 +873,7 @@ private fun CartItemCard(
 @Composable
 private fun ExpiredCartItemCard(
     cartItem: CartItem,
-    packageDetails: PackageDetailData?,
+    packageDetails: TravelPackageWithImages?,
     onDeleteClick: () -> Unit
 ) {
     Card(
@@ -977,7 +980,7 @@ private fun TravelerChip(text: String) {
 @Composable
 private fun CheckoutBar(
     state: CartUiState.Success,
-    onCheckoutClick: (List<CartItem>) -> Unit
+    onCheckoutClick: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1025,7 +1028,7 @@ private fun CheckoutBar(
                     val selectedItems = state.availableItems.filter { it.cartItemId in state.selectedItemIds }
 
                     Button(
-                        onClick = { onCheckoutClick(selectedItems) },
+                        onClick = { onCheckoutClick() },
                         modifier = Modifier
                             .weight(1f)
                             .height(50.dp),

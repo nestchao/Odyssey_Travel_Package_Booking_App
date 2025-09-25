@@ -1,102 +1,50 @@
 package com.example.mad_assignment.data.repository
 
 import android.util.Log
+import com.example.mad_assignment.data.datasource.PackageImageDataSource
 import com.example.mad_assignment.data.datasource.TravelPackageDataSource
-import com.example.mad_assignment.data.model.DepartureAndEndTime
-import com.example.mad_assignment.data.model.PackageImage
-import com.example.mad_assignment.data.model.TravelPackage
-import com.example.mad_assignment.data.model.Trip
-import com.example.mad_assignment.ui.home.TravelPackageWithImages
-import com.example.mad_assignment.ui.packagedetail.PackageDetailData
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flatMapLatest
+import com.example.mad_assignment.data.model.*
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.Timestamp
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.catch
+import javax.inject.Singleton
 
+@Singleton
 class TravelPackageRepository @Inject constructor(
-    private val dataSource: TravelPackageDataSource
+    private val packageDataSource: TravelPackageDataSource,
+    private val imageDataSource: PackageImageDataSource,
+    private val tripRepository: TripRepository,
+    private val firestore: FirebaseFirestore
 ) {
     fun getTravelPackages(): Flow<List<TravelPackage>> {
-        return dataSource.getAllTravelPackages()
-    }
-
-    fun getImagesForPackage(packageId: String): Flow<List<PackageImage>> {
-        return dataSource.getImagesForPackage(packageId)
+        return packageDataSource.getAllTravelPackages()
     }
 
     suspend fun getTravelPackage(packageId: String): TravelPackage? {
-        return dataSource.getPackageById(packageId)
-    }
-
-    suspend fun createPackageWithImages(newPackage: TravelPackage, images: List<PackageImage>): String {
-        return dataSource.addTravelPackageWithImages(newPackage, images)
-    }
-
-    suspend fun deletePackage(packageId: String) {
-        dataSource.softDeletePackageAndImages(packageId)
-    }
-
-    suspend fun getTripsByIds(ids: List<String>): List<Trip> {
-        return dataSource.getTripsByIds(ids)
-    }
-
-    suspend fun resolveTripsForPackage(travelPackage: TravelPackage): Map<Int, List<Trip>> {
-        val allTripIds = travelPackage.itineraries
-            .map { it.tripId }
-            .filter { it.isNotBlank() }
-            .distinct()
-
-        if (allTripIds.isEmpty()) {
-            return emptyMap()
-        }
-
-        val trips = getTripsByIds(allTripIds)
-        if (trips.isEmpty()) {
-            return emptyMap()
-        }
-
-        val tripMap = trips.associateBy { it.tripId }
-
-        return travelPackage.itineraries
-            .groupBy { it.day }
-            .mapValues { (_, itemsForDay) ->
-                itemsForDay.mapNotNull { itineraryItem ->
-                    tripMap[itineraryItem.tripId]
-                }
-            }
+        return packageDataSource.getPackageById(packageId)
     }
 
     suspend fun getDepartureDates(packageId: String): List<DepartureAndEndTime> {
-        return dataSource.getDepartureDatesForPackage(packageId)
+        return packageDataSource.getDepartureDatesForPackage(packageId)
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     fun getTravelPackagesWithImages(): Flow<List<TravelPackageWithImages>> {
-        return dataSource.getAllTravelPackages()
+        return packageDataSource.getAllTravelPackages()
             .flatMapLatest { packages ->
-                Log.d("Repository", "Got ${packages.size} packages")
                 if (packages.isEmpty()) {
                     flowOf(emptyList())
                 } else {
                     val imageFlows: List<Flow<List<PackageImage>>> = packages.map { pkg ->
-                        dataSource.getImagesForPackage(pkg.packageId)
+                        imageDataSource.getImagesForPackage(pkg.packageId)
                             .catch { e ->
-                                Log.e("Repository", "Error fetching images for package ${pkg.packageId}", e)
-                                emit(emptyList()) // Emit empty list if images fail to load
+                                Log.e("Repository", "Error images for ${pkg.packageId}", e)
+                                emit(emptyList())
                             }
                     }
-
-                    combine(imageFlows) { imagesArray: Array<List<PackageImage>> ->
-                        packages.zip(imagesArray.toList()) { travelPackage, images ->
-                            TravelPackageWithImages(
-                                travelPackage = travelPackage,
-                                images = images
-                            )
-                        }
+                    combine(imageFlows) { imagesArray ->
+                        packages.zip(imagesArray.toList(), ::TravelPackageWithImages)
                     }
                 }
             }
@@ -106,31 +54,126 @@ class TravelPackageRepository @Inject constructor(
             }
     }
 
-    suspend fun getPackageWithImages(packageId: String): PackageDetailData? {
-        return try {
-            Log.d("Repository", "Getting package with images for ID: $packageId")
-            val travelPackage = dataSource.getPackageById(packageId)
-            if (travelPackage == null) {
-                Log.e("Repository", "Travel package not found for ID: $packageId")
-                return null
-            }
+    suspend fun getPackageWithImages(packageId: String): TravelPackageWithImages? {
+        val travelPackage = packageDataSource.getPackageById(packageId) ?: return null
+        val images = imageDataSource.getImagesForPackage(packageId).first()
+        return TravelPackageWithImages(travelPackage, images)
+    }
 
-            Log.d("Repository", "Package found: ${travelPackage.packageName}, getting images...")
-            val images = try {
-                dataSource.getImagesForPackage(packageId).first()
-            } catch (e: Exception) {
-                Log.e("Repository", "Error getting images for package $packageId", e)
-                emptyList()
-            }
+    suspend fun resolveTripsForPackage(travelPackage: TravelPackage): Map<Int, List<Trip>> {
+        val allTripIds = travelPackage.itineraries.map { it.tripId }.filter { it.isNotBlank() }.distinct()
+        if (allTripIds.isEmpty()) return emptyMap()
 
-            Log.d("Repository", "Found ${images.size} images for package")
-            PackageDetailData(
-                travelPackage = travelPackage,
-                images = images
-            )
-        } catch (e: Exception) {
-            Log.e("Repository", "Error in getPackageWithImages for packageId: $packageId", e)
-            null
+        val trips = tripRepository.getTripsByIds(allTripIds)
+        if (trips.isEmpty()) return emptyMap()
+
+        val tripMap = trips.associateBy { it.tripId }
+
+        return travelPackage.itineraries
+            .groupBy { it.day }
+            .mapValues { (_, itemsForDay) ->
+                itemsForDay.mapNotNull { tripMap[it.tripId] }
+            }
+    }
+
+    suspend fun createPackageWithImages(newPackage: TravelPackage, images: List<PackageImage>): String {
+        val batch = firestore.batch()
+
+        val packageCollection = firestore.collection(TravelPackageDataSource.PACKAGES_COLLECTION)
+        val packageDocRef = packageCollection.document()
+        val packageId = packageDocRef.id
+
+        val imageCollection = firestore.collection(PackageImageDataSource.PACKAGE_IMAGES_COLLECTION)
+        val imageDocIds = mutableListOf<String>()
+        val finalImages = images.map { image ->
+            val imageDocRef = imageCollection.document()
+            imageDocIds.add(imageDocRef.id)
+            image.copy(imageId = imageDocRef.id, packageId = packageId)
         }
+
+        finalImages.forEach { finalImage ->
+            val docRef = imageCollection.document(finalImage.imageId)
+            batch.set(docRef, finalImage)
+        }
+
+
+        val finalPackage = newPackage.copy(
+            packageId = packageId,
+            imageDocsId = imageDocIds,
+            createdAt = Timestamp.now()
+        )
+        batch.set(packageDocRef, finalPackage)
+
+        batch.commit().await()
+        return packageId
+    }
+
+    suspend fun deletePackage(packageId: String) {
+        val batch = firestore.batch()
+        val deleteTimestamp = Timestamp.now()
+
+        val packageDocRef = firestore.collection(TravelPackageDataSource.PACKAGES_COLLECTION).document(packageId)
+        batch.update(packageDocRef, "deletedAt", deleteTimestamp)
+
+        val imagesQuery = firestore.collection(PackageImageDataSource.PACKAGE_IMAGES_COLLECTION)
+            .whereEqualTo("packageId", packageId)
+            .get().await()
+        imagesQuery.documents.forEach { doc ->
+            batch.update(doc.reference, "deletedAt", deleteTimestamp)
+        }
+
+        batch.commit().await()
+    }
+
+    suspend fun updatePackageWithImages(
+        packageToUpdate: TravelPackage,
+        newImages: List<PackageImage>,
+        removedImageIds: Set<String>
+    ) {
+        val batch = firestore.batch()
+        val packageId = packageToUpdate.packageId
+        if (packageId.isEmpty()) {
+            throw IllegalArgumentException("Package ID cannot be empty for an update.")
+        }
+
+        val imageCollection = firestore.collection(PackageImageDataSource.PACKAGE_IMAGES_COLLECTION)
+
+        // 1. Add new images to the batch
+        val newImageDocIds = mutableListOf<String>()
+        val finalNewImages = newImages.map { image ->
+            val imageDocRef = imageCollection.document()
+            newImageDocIds.add(imageDocRef.id)
+            // Ensure the new images are linked to the existing package
+            image.copy(imageId = imageDocRef.id, packageId = packageId)
+        }
+        finalNewImages.forEach { finalImage ->
+            val docRef = imageCollection.document(finalImage.imageId)
+            batch.set(docRef, finalImage)
+        }
+
+        // 2. Soft-delete removed images
+        val deleteTimestamp = Timestamp.now()
+        removedImageIds.forEach { imageId ->
+            val docRef = imageCollection.document(imageId)
+            batch.update(docRef, "deletedAt", deleteTimestamp)
+        }
+
+        // 3. Prepare to update the main package document
+        val packageDocRef = firestore.collection(TravelPackageDataSource.PACKAGES_COLLECTION).document(packageId)
+
+        // Fetch current package to get the existing list of image IDs
+        val currentPackage = packageDocRef.get().await().toObject(TravelPackage::class.java)
+        val existingImageIds = currentPackage?.imageDocsId ?: emptyList()
+
+        // Calculate the final list of image IDs
+        val finalImageIds = (existingImageIds - removedImageIds) + newImageDocIds
+
+        val finalPackageData = packageToUpdate.copy(imageDocsId = finalImageIds)
+
+        // Update the package document in the batch
+        batch.set(packageDocRef, finalPackageData)
+
+        // 4. Commit all changes atomically
+        batch.commit().await()
     }
 }

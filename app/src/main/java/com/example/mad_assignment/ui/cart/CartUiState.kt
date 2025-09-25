@@ -3,7 +3,7 @@ package com.example.mad_assignment.ui.cart
 import com.example.mad_assignment.data.model.Cart
 import com.example.mad_assignment.data.model.CartItem
 import com.example.mad_assignment.data.model.TravelPackage
-import com.example.mad_assignment.ui.packagedetail.PackageDetailData
+import com.example.mad_assignment.data.model.TravelPackageWithImages
 
 sealed interface CartUiState {
     object Loading : CartUiState
@@ -17,7 +17,7 @@ sealed interface CartUiState {
         val editingItemId: String? = null,
         val showPackageDetails: Boolean = false,
         val selectedPackageId: String? = null,
-        val packages: List<PackageDetailData?> = emptyList()
+        val packages: List<TravelPackageWithImages?> = emptyList()
     ) : CartUiState {
         val totalSelectedPrice: Double
             get() = availableItems
@@ -39,7 +39,7 @@ sealed interface CartUiState {
                 availableItems.find { it.cartItemId == id }
             }
 
-        val selectedPackage: PackageDetailData?
+        val selectedPackage: TravelPackageWithImages?
             get() = selectedPackageId?.let { id ->
                 packages.find { it?.travelPackage?.packageId == id }
             }
