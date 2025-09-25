@@ -7,19 +7,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -30,60 +18,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.DriveEta
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Flight
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Hotel
-import androidx.compose.material.icons.filled.LocalActivity
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.TravelExplore
-import androidx.compose.material.icons.filled.WbSunny
-import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material.icons.outlined.ShoppingCart
-import androidx.compose.material.icons.outlined.ErrorOutline
-import androidx.compose.material.icons.outlined.Explore
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.ShoppingBag
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -97,7 +35,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -108,9 +45,9 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.mad_assignment.data.model.TravelPackageWithImages
 import com.example.mad_assignment.data.datasource.NotificationsDataSource
 import com.example.mad_assignment.data.datasource.ScheduledNotificationDataSource
+import com.example.mad_assignment.data.model.TravelPackageWithImages
 import com.example.mad_assignment.data.repository.NotificationRepository
 import com.example.mad_assignment.ui.notifications.NotificationsViewModel
 import com.example.mad_assignment.ui.notifications.NotificationsViewModelFactory
@@ -119,15 +56,16 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.android.gms.location.LocationServices
 import com.google.firebase.firestore.FirebaseFirestore
-import java.util.Locale
+import java.util.*
 
 @Composable
 fun HomeScreen(
     onPackageClick: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
     onNavigateToManagement: () -> Unit,
-    onBellClick: (String) -> Unit,
-    onNavigateToCart: () -> Unit
+    onBellClick: () -> Unit,
+    onNavigateToCart: () -> Unit,
+    onNavigateToProfile: () -> Unit
 ) {
     val viewModel: HomeViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -136,16 +74,6 @@ fun HomeScreen(
 
     Scaffold(
         floatingActionButton = {
-            val successState = uiState as? HomeUiState.Success
-            if (successState?.isAdmin == true) {
-                FloatingActionButton(
-                    onClick = { onNavigateToManagement() },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add new travel package")
-                }
-            }
         }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
@@ -155,6 +83,8 @@ fun HomeScreen(
                     onPackageClick = onPackageClick,
                     onNavigateToSearch = onNavigateToSearch,
                     onNavigateToCart = onNavigateToCart,
+                    onBellClick = onBellClick,
+                    onNavigateToProfile = onNavigateToProfile
                 )
             } else {
                 PhoneHomeScreen(
@@ -175,16 +105,14 @@ fun PhoneHomeScreen(
     uiState: HomeUiState,
     onPackageClick: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
-    onBellClick: (String) -> Unit,
+    onBellClick: () -> Unit,
     onNavigateToCart: () -> Unit
 ) {
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
         when (val state = uiState) {
-            is HomeUiState.Loading -> {
-                EnhancedLoadingState()
-            }
+            is HomeUiState.Loading -> EnhancedLoadingState()
             is HomeUiState.Success -> {
                 EnhancedHomeContent(
                     packages = state.packages,
@@ -194,9 +122,7 @@ fun PhoneHomeScreen(
                     onNavigateToCart = onNavigateToCart
                 )
             }
-            is HomeUiState.Error -> {
-                EnhancedErrorState(message = state.message)
-            }
+            is HomeUiState.Error -> EnhancedErrorState(message = state.message)
         }
     }
 }
@@ -206,7 +132,7 @@ fun EnhancedHomeContent(
     packages: List<TravelPackageWithImages>,
     onPackageClick: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
-    onBellClick: (String) -> Unit,
+    onBellClick: () -> Unit,
     onNavigateToCart: () -> Unit
 ) {
     LazyColumn(
@@ -246,7 +172,7 @@ fun EnhancedHomeContent(
 @Composable
 fun EnhancedHomeHeader(
     onNavigateToSearch: () -> Unit,
-    onBellClick: (String) -> Unit,
+    onBellClick: () -> Unit,
     onNavigateToCart: () -> Unit
 ) {
     Card(
@@ -316,7 +242,7 @@ fun EnhancedHomeHeader(
                     val unreadCount by notificationViewModel.unreadCount.collectAsState()
 
                     Surface(
-                        onClick = { onBellClick("notifications") },
+                        onClick = { onBellClick() },
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surface,
                         modifier = Modifier.size(48.dp)
@@ -377,6 +303,7 @@ fun EnhancedHomeHeader(
     }
 }
 
+// ... (Other composables like EnhancedAroundYouSection, EnhancedPackageCard remain the same) ...
 @Composable
 fun EnhancedAroundYouSection(
     featuredPackages: List<TravelPackageWithImages>,
@@ -569,52 +496,47 @@ fun EnhancedPackageCard(
     }
 }
 
+
 @Composable
 fun TabletHomeScreen(
     uiState: HomeUiState,
     onPackageClick: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
-    onNavigateToCart: () -> Unit
+    onNavigateToCart: () -> Unit,
+    onBellClick: () -> Unit,
+    onNavigateToProfile: () -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
-    // REMOVED Scaffold and Row. This composable is now just the content area.
-    Box(
-        modifier = Modifier.fillMaxSize()
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
         when (val state = uiState) {
-            is HomeUiState.Loading -> {
-                EnhancedLoadingState()
-            }
+            is HomeUiState.Loading -> EnhancedLoadingState()
             is HomeUiState.Success -> {
                 TabletHomeContent(
                     packages = state.packages,
                     onPackageClick = onPackageClick,
                     onNavigateToSearch = onNavigateToSearch,
-                    isLandscape = isLandscape
+                    isLandscape = isLandscape,
+                    onNavigateToCart = onNavigateToCart,
+                    onBellClick = onBellClick,
+                    onNavigateToProfile = onNavigateToProfile
                 )
             }
-            is HomeUiState.Error -> {
-                EnhancedErrorState(message = state.message)
-            }
+            is HomeUiState.Error -> EnhancedErrorState(message = state.message)
         }
     }
 }
-
-data class SideNavItem(
-    val label: String,
-    val route: String,
-    val outlinedIcon: ImageVector,
-    val filledIcon: ImageVector
-)
 
 @Composable
 fun TabletHomeContent(
     packages: List<TravelPackageWithImages>,
     onPackageClick: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
-    isLandscape: Boolean
+    isLandscape: Boolean,
+    onNavigateToCart: () -> Unit,
+    onBellClick: () -> Unit,
+    onNavigateToProfile: () -> Unit
 ) {
     val listState = rememberLazyListState()
     val horizontalPadding = if (isLandscape) 24.dp else 16.dp
@@ -629,13 +551,14 @@ fun TabletHomeContent(
             TabletHomeHeader(
                 onNavigateToSearch = onNavigateToSearch,
                 horizontalPadding = horizontalPadding,
-                isLandscape = isLandscape
+                isLandscape = isLandscape,
+                onNavigateToCart = onNavigateToCart,
+                onBellClick = onBellClick,
+                onNavigateToProfile = onNavigateToProfile
             )
         }
         if (!isLandscape) {
-            item {
-                WelcomeSection()
-            }
+            item { WelcomeSection() }
         }
         item {
             TabletFeaturedSection(
@@ -646,7 +569,6 @@ fun TabletHomeContent(
             )
         }
         item {
-            // All Packages Section with better separation
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -656,12 +578,7 @@ fun TabletHomeContent(
                 ),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp)
-                ) {
-                    // Section Header
+                Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -681,10 +598,7 @@ fun TabletHomeContent(
                             )
                         }
                     }
-
                     Spacer(modifier = Modifier.height(20.dp))
-
-                    // Packages Grid
                     TabletPackagesGrid(
                         packages = packages,
                         onPackageClick = onPackageClick,
@@ -698,169 +612,13 @@ fun TabletHomeContent(
 }
 
 @Composable
-fun TabletSideNavigation(
-    modifier: Modifier = Modifier,
-    navController: NavController // Add NavController parameter
-) {
-    val items = listOf(
-        SideNavItem("Home", "home", Icons.Outlined.Home, Icons.Filled.Home),
-        SideNavItem("Explore", "explore", Icons.Outlined.Explore, Icons.Filled.Explore),
-        SideNavItem("Bookings", "bookings", Icons.Outlined.BookmarkBorder, Icons.Filled.Bookmark),
-        SideNavItem("Favorites", "favorites", Icons.Outlined.FavoriteBorder, Icons.Filled.Favorite),
-        SideNavItem("Profile", "profile", Icons.Outlined.Person, Icons.Filled.Person),
-        SideNavItem("Settings", "settings", Icons.Outlined.Settings, Icons.Filled.Settings)
-    )
-
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
-
-    Surface(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 2.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                ),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        Icons.Default.TravelExplore,
-                        contentDescription = null,
-                        modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Odyssey",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                items(items.size) { index ->
-                    val item = items[index]
-                    val isSelected = currentRoute == item.route // Check if the item's route matches the current route
-
-                    Surface(
-                        onClick = {
-                            // Navigate when an item is clicked
-                            navController.navigate(item.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (isSelected)
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                        else
-                            Color.Transparent
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                if (isSelected) item.filledIcon else item.outlinedIcon,
-                                contentDescription = item.label,
-                                tint = if (isSelected)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Text(
-                                item.label,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                color = if (isSelected)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                ),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                Icons.Default.Person,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            "John Doe",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            "Traveler",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun TabletHomeHeader(
     onNavigateToSearch: () -> Unit,
     horizontalPadding: Dp,
-    isLandscape: Boolean
+    isLandscape: Boolean,
+    onNavigateToCart: () -> Unit,
+    onBellClick: () -> Unit,
+    onNavigateToProfile: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -878,10 +636,7 @@ fun TabletHomeHeader(
                     .padding(32.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Welcome Text Section
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Good Morning! ☀️",
                         style = MaterialTheme.typography.titleMedium,
@@ -897,35 +652,30 @@ fun TabletHomeHeader(
                     Spacer(modifier = Modifier.height(16.dp))
                     WelcomeSection()
                 }
-
                 Spacer(modifier = Modifier.width(32.dp))
-
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.align(Alignment.End)
                     ) {
+                        // FIXED: Added onClick handlers
                         TabletActionButton(
                             icon = Icons.Outlined.ShoppingBag,
                             badge = true,
-                            onClick = { /* TODO: Cart Button */ }
+                            onClick = onNavigateToCart
                         )
                         TabletActionButton(
                             icon = Icons.Outlined.Notifications,
                             badge = true,
-                            badgeText = "3",
-                            onClick = { /* TODO: Notifications */ }
+                            badgeText = "3", // This can be dynamic later
+                            onClick = onBellClick
                         )
                         TabletActionButton(
                             icon = Icons.Outlined.Person,
-                            onClick = { /* TODO: Profile */ }
+                            onClick = onNavigateToProfile
                         )
                     }
-
                     Spacer(modifier = Modifier.height(24.dp))
-
                     Surface(
                         onClick = onNavigateToSearch,
                         shape = RoundedCornerShape(20.dp),
@@ -954,7 +704,7 @@ fun TabletHomeHeader(
                     }
                 }
             }
-        } else {
+        } else { // Portrait Tablet
             Column(modifier = Modifier.padding(32.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -974,24 +724,22 @@ fun TabletHomeHeader(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
-
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        // FIXED: Added onClick handlers
                         TabletActionButton(
                             icon = Icons.Outlined.ShoppingBag,
                             badge = true,
-                            onClick = { /* TODO: Cart */ }
+                            onClick = onNavigateToCart
                         )
                         TabletActionButton(
                             icon = Icons.Outlined.Notifications,
                             badge = true,
                             badgeText = "3",
-                            onClick = { /* TODO: Notifications */ }
+                            onClick = onBellClick
                         )
                     }
                 }
-
                 Spacer(modifier = Modifier.height(32.dp))
-
                 Surface(
                     onClick = onNavigateToSearch,
                     shape = RoundedCornerShape(20.dp),
@@ -1023,6 +771,8 @@ fun TabletHomeHeader(
     }
 }
 
+
+// ... (The rest of the file remains the same) ...
 @Composable
 fun TabletActionButton(
     icon: ImageVector,

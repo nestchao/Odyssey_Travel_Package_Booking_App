@@ -19,8 +19,6 @@ class HomeViewModel @Inject constructor(
     private val travelPackageRepository: TravelPackageRepository
 ) : ViewModel() {
 
-    private var isUserAdmin: Boolean = true
-
     val uiState: StateFlow<HomeUiState> =
         travelPackageRepository.getTravelPackagesWithImages()
             .onStart {
@@ -29,8 +27,7 @@ class HomeViewModel @Inject constructor(
             .map<List<TravelPackageWithImages>, HomeUiState> { packagesWithImages ->
                 Log.d("HomeViewModel", "Successfully loaded ${packagesWithImages.size} packages")
                 HomeUiState.Success(
-                    packages = packagesWithImages,
-                    isAdmin = isUserAdmin
+                    packages = packagesWithImages
                     )
             }
             .catch { exception ->
