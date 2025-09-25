@@ -5,13 +5,17 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mad_assignment.data.model.CartItem
+import com.example.mad_assignment.data.model.ChatMessage
 import com.example.mad_assignment.data.model.DepartureAndEndTime
 import com.example.mad_assignment.data.repository.CartRepository
 import com.example.mad_assignment.data.repository.RecentlyViewedRepository
 import com.example.mad_assignment.data.repository.TravelPackageRepository
 import com.example.mad_assignment.data.repository.WishlistRepository
+import com.example.mad_assignment.di.AppModule
+import com.google.ai.client.generativeai.GenerativeModel
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -31,6 +35,8 @@ class PackageDetailViewModel @Inject constructor(
     private val wishlistRepository: WishlistRepository,
     private val recentlyViewedRepository: RecentlyViewedRepository,
     private val auth: FirebaseAuth,
+    private val generativeModel: GenerativeModel,
+    private val gson: Gson,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -51,6 +57,91 @@ class PackageDetailViewModel @Inject constructor(
         } else {
             Log.e("PackageDetailVM", "Package ID is null")
             _uiState.value = PackageDetailUiState.Error("Package ID not provided")
+        }
+    }
+
+    fun showChat(show: Boolean) {
+        _uiState.update {
+            if (it is PackageDetailUiState.Success) {
+                it.copy(isChatVisible = show)
+            } else it
+        }
+    }
+
+    fun onChatPromptChanged(newPrompt: String) {
+        _uiState.update {
+            if (it is PackageDetailUiState.Success) {
+                it.copy(chatState = it.chatState.copy(prompt = newPrompt))
+            } else it
+        }
+    }
+
+    fun sendChatMessage(promptFromUser: String) {
+        val currentState = _uiState.value
+        if (currentState !is PackageDetailUiState.Success) return
+        if (promptFromUser.isBlank()) return
+
+        // Add user message to UI immediately
+        val userMessage = ChatMessage(text = promptFromUser, isFromUser = true)
+        _uiState.update {
+            (it as PackageDetailUiState.Success).let { successState ->
+                successState.copy(
+                    chatState = successState.chatState.copy(
+                        messages = successState.chatState.messages + userMessage,
+                        prompt = "", // Clear input field
+                        isLoading = true
+                    )
+                )
+            }
+        }
+
+        viewModelScope.launch {
+            try {
+                // *** THE MAGIC: CONSTRUCT THE CONTEXT-AWARE PROMPT ***
+                val packageJson = gson.toJson(currentState.packageDetail.travelPackage)
+                val fullPrompt = """
+                    You are a friendly and helpful travel assistant for the 'Odyssey' travel agency.
+                    Your task is to answer questions about a specific travel package.
+                    Use ONLY the information provided in the following JSON data. Do not make up information.
+                    If the user asks a question that cannot be answered from the data, politely say that you don't have that specific information.
+
+                    PACKAGE DATA:
+                    $packageJson
+
+                    USER'S QUESTION:
+                    "$promptFromUser"
+                """.trimIndent()
+
+                // This line will now compile and work correctly!
+                val response = generativeModel.generateContent(fullPrompt)
+                val aiResponse = response.text ?: "Sorry, I couldn't process that. Please try again."
+
+                // Add AI response to UI
+                val aiMessage = ChatMessage(text = aiResponse, isFromUser = false)
+                _uiState.update {
+                    (it as PackageDetailUiState.Success).let { successState ->
+                        successState.copy(
+                            chatState = successState.chatState.copy(
+                                messages = successState.chatState.messages + aiMessage,
+                                isLoading = false
+                            )
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "Error generating content", e)
+                val errorMessage = ChatMessage("Error: ${e.message}", isFromUser = false)
+                _uiState.update {
+                    (it as PackageDetailUiState.Success).let { successState ->
+                        successState.copy(
+                            chatState = successState.chatState.copy(
+                                messages = successState.chatState.messages + errorMessage,
+                                isLoading = false
+                            )
+                        )
+                    }
+                }
+            }
         }
     }
 

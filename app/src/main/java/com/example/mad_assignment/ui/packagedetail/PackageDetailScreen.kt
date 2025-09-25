@@ -98,19 +98,20 @@ import com.google.firebase.Timestamp
 import com.google.gson.Gson
 import java.text.SimpleDateFormat
 import java.util.Locale
+import androidx.compose.material.icons.filled.Chat
 
 @Composable
 fun PackageDetailScreen(
     onNavigateBack: () -> Unit,
     onNavigateToCart: () -> Unit,
     onNavigateToCheckout: (packageId: String, departureId: String, paxCountsJson: String) -> Unit,
-) {
+    ) {
     val viewModel: PackageDetailViewModel = hiltViewModel()
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { paddingValues ->
         Box(modifier = Modifier
             .fillMaxSize()
@@ -149,7 +150,11 @@ fun PackageDetailScreen(
                             .asPaddingValues()
                     ) {
                         item {
-                            EnhancedImageHeader(state.packageDetail, onNavigateBack)
+                            EnhancedImageHeader(
+                                packageDetail = state.packageDetail,
+                                onNavigateBack = onNavigateBack,
+                                onShowChat = { viewModel.showChat(true) } // Pass the function here
+                            )
                         }
                         item {
                             PackageTitle(state.packageDetail.travelPackage)
@@ -204,6 +209,15 @@ fun PackageDetailScreen(
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding()
                     )
+
+                    if (state.isChatVisible) {
+                        ChatAssistantBottomSheet(
+                            chatState = state.chatState,
+                            onDismiss = { viewModel.showChat(false) },
+                            onPromptChange = { viewModel.onChatPromptChanged(it) },
+                            onSendMessage = { viewModel.sendChatMessage(it) }
+                        )
+                    }
                 }
 
                 is PackageDetailUiState.Error -> {
@@ -623,7 +637,8 @@ fun EnhancedLocationSection(itineraryTrips: Map<Int, List<Trip>>) {
 @Composable
 fun EnhancedImageHeader(
     packageDetail: TravelPackageWithImages,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onShowChat: () -> Unit // New parameter for showing chat
 ) {
     val images = packageDetail.images
     val pagerState = rememberPagerState(pageCount = { images.size })
@@ -692,6 +707,24 @@ fun EnhancedImageHeader(
             val isInWishlist by viewModel.isInWishlist.collectAsStateWithLifecycle()
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Chat Assistant Button
+                Surface(
+                    onClick = onShowChat, // Call the new onShowChat lambda
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.4f),
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.Chat, // Chat icon
+                            contentDescription = "AI Assistant",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                // Wishlist Button
                 Surface(
                     onClick = {
                         viewModel.toggleFavButton()
