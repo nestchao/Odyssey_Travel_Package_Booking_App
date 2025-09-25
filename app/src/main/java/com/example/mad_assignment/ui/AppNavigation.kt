@@ -147,8 +147,6 @@ fun AppNavigation(){
                 mainViewModel = mainViewModel,
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
                 onNavigateToSearch = { navController.navigate("search") },
-                onNavigateToCart = { navController.navigate("cart") }
-                onNavigateToSearch = { navController.navigate("search") },
                 onNavigateToManagement = { navController.navigate("manage") },
                 onBellClick = { navController.navigate("notifications") },
                 onSignOut = { navController.navigate("signin") { popUpTo(navController.graph.startDestinationId) { inclusive = true } } },
