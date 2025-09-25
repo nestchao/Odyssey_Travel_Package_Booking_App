@@ -370,7 +370,6 @@ private fun PhoneContainerScreen(
     onNavigateToWishlist: () -> Unit,
     onNavigateToRecentlyViewed: () -> Unit,
     onNavigateToCart: () -> Unit,
-    onBookingDetailsClick: (Booking) -> Unit
 ) {
     val contentNavController = rememberNavController()
 
