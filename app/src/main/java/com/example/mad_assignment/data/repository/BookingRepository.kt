@@ -25,7 +25,7 @@ class BookingRepository @Inject constructor(
         userId: String,
         cartId: String,
         cartItems: List<CartItem>,
-        paymentId: String // <-- ADD THIS PARAMETER
+        paymentId: String //
     ): Result<List<String>> {
         return bookingDataSource.createBookingsFromCart(userId, cartId, cartItems, paymentId)
             .onFailure { Log.e(TAG, "createBookingsFromCart failed", it) }

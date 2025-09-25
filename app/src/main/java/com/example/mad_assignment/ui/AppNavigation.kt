@@ -28,6 +28,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.example.mad_assignment.R
+import com.example.mad_assignment.data.model.Booking
 import com.example.mad_assignment.data.model.User
 import com.example.mad_assignment.data.model.UserType
 import com.example.mad_assignment.ui.aboutus.AboutUsScreen
@@ -36,6 +37,7 @@ import com.example.mad_assignment.ui.accountdetail.AccountDetailsScreen
 import com.example.mad_assignment.ui.accountdetail.AccountDetailsViewModel
 import com.example.mad_assignment.ui.admindashboard.AdminDashboardScreen
 import com.example.mad_assignment.ui.admindashboard.AdminDashboardViewModel
+import com.example.mad_assignment.ui.booking.BookingsScreen
 import com.example.mad_assignment.ui.changepassword.ChangePasswordScreen
 import com.example.mad_assignment.ui.changepassword.ChangePasswordViewModel
 import com.example.mad_assignment.ui.explore.ExploreScreen
@@ -62,7 +64,12 @@ import com.example.mad_assignment.ui.signup.SignUpViewModel
 import com.example.mad_assignment.ui.wishlist.WishlistScreen
 import com.example.mad_assignment.ui.cart.CartScreen
 import com.example.mad_assignment.ui.checkout.CheckoutScreen
+import com.example.mad_assignment.ui.managepayment.ManagePaymentScreen
+import com.example.mad_assignment.ui.managepayment.ManagePaymentViewModel
+import com.example.mad_assignment.ui.manageuser.ManageUserScreen
+import com.example.mad_assignment.ui.manageuser.ManageUserViewModel
 import com.google.gson.Gson
+import com.example.mad_assignment.ui.cart.CartScreen
 
 @Composable
 fun AppNavigation(){
@@ -136,7 +143,8 @@ fun AppNavigation(){
                 onNavigateToSettings = { navController.navigate("setting") },
                 onNavigateToRecentlyViewed = { navController.navigate("recentlyViewed") },
                 onNavigateToWishlist = { navController.navigate("wishlist") },
-                onNavigateToCart = { navController.navigate("cart") }
+                onNavigateToCart = { navController.navigate("cart") },
+                onBookingDetailsClick = { navController.navigate("bookings") }
             )
         }
 
@@ -146,6 +154,7 @@ fun AppNavigation(){
                 mainViewModel = mainViewModel,
                 onNavigateToDetail = { packageId -> navController.navigate("detail/$packageId") },
                 onNavigateToSearch = { navController.navigate("search") },
+                onNavigateToCart = { navController.navigate("cart") },
                 onNavigateToManagement = { navController.navigate("manage") },
                 onBellClick = { navController.navigate("notifications") },
                 onSignOut = { navController.navigate("signin") { popUpTo(navController.graph.startDestinationId) { inclusive = true } } },
@@ -156,7 +165,7 @@ fun AppNavigation(){
                 onNavigateToSettings = { navController.navigate("setting") }, // This is unused in tablet but kept for consistency
                 onNavigateToRecentlyViewed = { navController.navigate("recentlyViewed") },
                 onNavigateToWishlist = { navController.navigate("wishlist") },
-                onNavigateToCart = { navController.navigate("cart") },
+                onBookingDetailsClick = { navController.navigate("bookings") }
             )
         }
 
@@ -297,15 +306,32 @@ fun AppNavigation(){
             val viewModel: AdminDashboardViewModel = hiltViewModel()
             AdminDashboardScreen(
                 viewModel = viewModel,
-                onNavigateToUsers = { navController.navigate("admin_users") },
+                onNavigateToUsers = { navController.navigate("manage_user") },
                 onNavigateToBookings = { navController.navigate("admin_bookings") },
-                onNavigateToAnalytics = { navController.navigate("admin_analytics") },
-                onNavigateToSettings = { navController.navigate("admin_settings") },
+                onNavigateToPackage = { navController.navigate("manage") },
+                onNavigateToPayment = { navController.navigate("manage_payment") },
+                onNavigateToNotifications = { navController.navigate("notificationScheduler") },
                 onSignOut = {
                     navController.navigate("signin") {
                         popUpTo("admin_dashboard") { inclusive = true }
                     }
                 }
+            )
+        }
+        composable("manage_payment") {
+            val viewModel: ManagePaymentViewModel = hiltViewModel()
+            ManagePaymentScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+
+        composable("manage_user") {
+            val viewModel: ManageUserViewModel = hiltViewModel()
+            ManageUserScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
@@ -344,6 +370,7 @@ private fun PhoneContainerScreen(
     onNavigateToWishlist: () -> Unit,
     onNavigateToRecentlyViewed: () -> Unit,
     onNavigateToCart: () -> Unit,
+    onBookingDetailsClick: (Booking) -> Unit
 ) {
     val contentNavController = rememberNavController()
 
@@ -394,6 +421,7 @@ private fun TabletContainerScreen(
     // Add these lambdas to handle navigation from the settings screen
     onNavigateToChangePassword: () -> Unit,
     onNavigateToAboutUs: () -> Unit,
+    onBookingDetailsClick: (Booking) -> Unit
 ) {
     val user by mainViewModel.currentUser.collectAsState()
     val contentNavController = rememberNavController()
@@ -462,6 +490,7 @@ private fun TabletContainerScreen(
             onNavigateToWishlist = onNavigateToWishlist,
             onNavigateToRecentlyViewed = onNavigateToRecentlyViewed,
             onNavigateToCart = onNavigateToCart,
+            onBookingDetailsClick = onBookingDetailsClick
         )
     }
 }
@@ -486,7 +515,11 @@ private fun NavGraphBuilder.sharedAppGraph(
         )
     }
     composable("explore") { ExploreScreen(onPackageClick = onNavigateToDetail) }
-    composable("bookings") { PlaceholderScreen(screenName = "Bookings") }
+    composable("bookings") {
+        BookingsScreen(
+            onBookingDetailsClick = onNavigateToDetail
+        )
+    }
 }
 
 private data class SideNavItem(
