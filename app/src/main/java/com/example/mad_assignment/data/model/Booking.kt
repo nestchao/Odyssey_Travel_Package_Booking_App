@@ -7,6 +7,7 @@ data class Booking(
     @DocumentId val bookingId: String = "",
     val userId: String = "", // get from cart
     val packageId: String = "", // get from cart item
+    val departureId: String = "",
     val paymentId: String = "", // get from payment
     val noOfAdults: Int = 0, // get from cart item
     val noOfChildren: Int = 0, // get from cart item
