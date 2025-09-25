@@ -2,6 +2,8 @@ package com.example.mad_assignment.data.datasource
 
 import com.example.mad_assignment.data.model.User
 import com.example.mad_assignment.data.model.UserType
+import com.google.firebase.Timestamp
+import com.google.firebase.firestore.AggregateSource
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.toObjects
@@ -11,6 +13,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import java.util.Calendar
 
 @Singleton
 class UserDataSource @Inject constructor(
@@ -149,6 +152,36 @@ class UserDataSource @Inject constructor(
 
         } catch (e: Exception) {
             throw e
+        }
+    }
+
+    suspend fun countAllActiveUsers(): Result<Long> {
+        return try {
+            val countQuery = firestore.collection(USERS_COLLECTION)
+                .whereEqualTo("isActive", true)
+            val snapshot = countQuery.count().get(AggregateSource.SERVER).await()
+            Result.success(snapshot.count)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun countNewUsersToday(): Result<Long> {
+        return try {
+            val calendar = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val startOfToday = Timestamp(calendar.time)
+
+            val countQuery = firestore.collection(USERS_COLLECTION)
+                .whereGreaterThanOrEqualTo("createdAt", startOfToday)
+            val snapshot = countQuery.count().get(AggregateSource.SERVER).await()
+            Result.success(snapshot.count)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 

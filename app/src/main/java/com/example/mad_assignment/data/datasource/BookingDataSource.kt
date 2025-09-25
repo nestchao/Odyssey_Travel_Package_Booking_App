@@ -8,6 +8,8 @@ import com.example.mad_assignment.data.model.TravelPackage
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.AggregateField
+import com.google.firebase.firestore.AggregateSource
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -109,6 +111,8 @@ class BookingDataSource @Inject constructor(
                         startBookingDate = cartItem.startDate, endBookingDate = cartItem.endDate,
                         createdAt = Timestamp.now(), updatedAt = Timestamp.now(), status = BookingStatus.PAID
                     )
+                    Log.d("DATA_TYPE_CHECK", "Saving booking. totalAmount is: ${newBooking.totalAmount}")
+                    Log.d("DATA_TYPE_CHECK", "The data type is: ${newBooking.totalAmount::class.java.simpleName}")
                     transaction.set(newBookingRef, newBooking)
                     bookingIds.add(newBookingRef.id)
                 }
@@ -424,6 +428,39 @@ class BookingDataSource @Inject constructor(
         } catch (e: Exception) {
             Log.e(TAG, "createBookingFromDirectPurchase failed", e)
             Result.failure(RuntimeException("Failed to create booking from direct purchase.", e))
+        }
+    }
+    suspend fun countAllBookings(): Result<Long> {
+        return try {
+            val snapshot = firestore.collection(BOOKINGS_COLLECTION)
+                .count().get(AggregateSource.SERVER).await()
+            Result.success(snapshot.count)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun countPendingBookings(): Result<Long> {
+        return try {
+            val snapshot = firestore.collection(BOOKINGS_COLLECTION)
+                .whereEqualTo("status", BookingStatus.PENDING.name)
+                .count().get(AggregateSource.SERVER).await()
+            Result.success(snapshot.count)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getTotalRevenue(): Result<Double> {
+        return try {
+            val snapshot = firestore.collection(BOOKINGS_COLLECTION)
+                .whereIn("status", listOf(BookingStatus.PAID, BookingStatus.COMPLETED))
+                .aggregate(AggregateField.sum("totalAmount")) // Sum the 'totalAmount' field
+                .get(AggregateSource.SERVER).await()
+
+            Result.success(snapshot.getDouble(AggregateField.sum("totalAmount")) ?: 0.0)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 }

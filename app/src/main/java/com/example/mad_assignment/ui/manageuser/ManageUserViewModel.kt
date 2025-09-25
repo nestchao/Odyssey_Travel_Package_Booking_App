@@ -2,8 +2,11 @@ package com.example.mad_assignment.ui.manageuser
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.mad_assignment.data.model.Activity
+import com.example.mad_assignment.data.model.ActivityType
 import com.example.mad_assignment.data.model.User
 import com.example.mad_assignment.data.model.UserType
+import com.example.mad_assignment.data.repository.ActivityRepository
 import com.example.mad_assignment.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,7 +17,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ManageUserViewModel @Inject constructor(
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val activityRepository: ActivityRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ManageUserUiState>(ManageUserUiState.Loading())
@@ -97,6 +101,12 @@ class ManageUserViewModel @Inject constructor(
                 )
                 if (userRepository.updateUser(user.userID, userUpdates)) {
                     loadUsers()
+                    val activity = Activity(
+                        description = "User profile updated for ${user.userEmail}",
+                        type = ActivityType.USER_UPDATED,
+                        userId = user.userID
+                    )
+                    activityRepository.createActivity(activity)
                 } else {
                     _uiState.value = ManageUserUiState.Error("Failed to update user.")
                 }

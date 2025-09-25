@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
+
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun AdminDashboardScreen(
@@ -310,7 +311,7 @@ private fun getStatCards(stats: DashboardStats): List<StatCardData> {
         ),
         StatCardData(
             title = "Revenue",
-            value = "$${String.format("%.0f", stats.totalRevenue)}",
+            value = "RM${String.format("%.0f", stats.totalRevenue)}",
             icon = Icons.Filled.AttachMoney,
             color = Color(0xFF8B5CF6),
             onClick = {}

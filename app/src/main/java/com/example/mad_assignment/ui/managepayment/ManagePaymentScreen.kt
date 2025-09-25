@@ -188,7 +188,7 @@ private fun PaymentCard(
                         fontWeight = FontWeight.Medium
                     )
                     Text(
-                        text = "Amount: $${payment.amount}",
+                        text = "Amount: RM${payment.amount}",
                         fontSize = 14.sp,
                         color = Color.Gray
                     )

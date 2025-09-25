@@ -33,7 +33,8 @@ class CheckoutViewModel @Inject constructor(
     private val paymentRepository: PaymentRepository,
     private val cartRepository: CartRepository,
     private val auth: FirebaseAuth,
-    private val savedStateHandle: SavedStateHandle
+    private val savedStateHandle: SavedStateHandle,
+    private val activityRepository: ActivityRepository
 ) : ViewModel() {
 
     private val checkoutMode =
@@ -185,6 +186,14 @@ class CheckoutViewModel @Inject constructor(
 
                 processingResult.fold(
                     onSuccess = { gatewayTransactionId ->
+                        val paymentActivity = Activity(
+                            description = "Payment of RM${String.format("%.2f", totalAmount)} completed.",
+                            type = ActivityType.PAYMENT_COMPLETED,
+                            userId = userId,
+                            relatedId = paymentId
+                        )
+                        activityRepository.createActivity(paymentActivity)
+
                         val bookingCreationResult = if (checkoutMode == CheckoutMode.DIRECT_BUY) {
                             createSingleBooking(userId, paymentId)
                         } else {
