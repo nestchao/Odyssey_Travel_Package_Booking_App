@@ -46,6 +46,7 @@ fun CheckoutScreen(
     var expiryDate by rememberSaveable { mutableStateOf("") }
     var cvc by rememberSaveable { mutableStateOf("") }
 
+    // This LaunchedEffect will now show more specific error messages from the ViewModel
     LaunchedEffect(checkoutResult) {
         when (val result = checkoutResult) {
             is CheckoutResultEvent.Success -> {
@@ -53,7 +54,7 @@ fun CheckoutScreen(
                 onPaymentSuccess()
             }
             is CheckoutResultEvent.Failure -> {
-                Toast.makeText(context, "Error: ${result.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
             }
             null -> {}
         }
@@ -107,19 +108,19 @@ fun CheckoutScreen(
 
                         Spacer(Modifier.weight(1f))
 
+                        // ** MODIFIED THIS COMPOSABLE CALL **
                         ConfirmButton(
                             state = state,
                             onConfirmAndPay = {
-                                val isFormValid = cardholderName.isNotBlank() &&
-                                        cardNumber.length == 16 &&
-                                        expiryDate.length == 4 &&
-                                        cvc.length == 3
-
-                                if (isFormValid) {
-                                    viewModel.onConfirmAndPay("Credit Card")
-                                } else {
-                                    Toast.makeText(context, "Please fill all payment details correctly.", Toast.LENGTH_SHORT).show()
-                                }
+                                // The simple UI-level check can be removed or kept for button enabling.
+                                // The robust validation is now in the ViewModel.
+                                viewModel.onConfirmAndPay(
+                                    paymentMethod = "Credit Card",
+                                    cardholderName = cardholderName,
+                                    cardNumber = cardNumber,
+                                    expiryDate = expiryDate,
+                                    cvc = cvc
+                                )
                             }
                         )
                     }

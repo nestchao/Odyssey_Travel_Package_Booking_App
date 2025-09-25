@@ -1,5 +1,6 @@
 package com.example.mad_assignment.ui.cart
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mad_assignment.data.model.Cart
@@ -41,57 +42,65 @@ class CartViewModel @Inject constructor(
             _uiState.value = CartUiState.Loading
 
             val currentUserId = getCurrentUserId()
-
             if (currentUserId == null) {
                 _uiState.value = CartUiState.Empty
                 return@launch
             }
 
             try {
-                // get user cart
-                val cartResult = cartRepository.getCartByUserId(currentUserId)
-                val cart = cartResult.getOrNull()
-
+                val cart = cartRepository.getCartByUserId(currentUserId).getOrNull()
                 if (cart == null || cart.cartItemIds.isEmpty()) {
                     _uiState.value = CartUiState.Empty
                     return@launch
                 }
 
-                // get all cart items in user cart
-                val cartItemsResult = cartRepository.getCartItemsForCart(cart.cartItemIds)
-                val cartItems = cartItemsResult.getOrDefault(emptyList())
+                val cartItems = cartRepository.getCartItemsForCart(cart.cartItemIds).getOrDefault(emptyList())
 
-                // separate cart items
+                // ** CHANGED LOGIC: Fetch ALL packages first for validation **
+                val allPackageIds = cartItems.map { it.packageId }.toSet()
+                val packagesWithImages = allPackageIds.mapNotNull { travelPackageRepository.getPackageWithImages(it) }
+                val packagesMap = packagesWithImages.associateBy { it.travelPackage.packageId }
+
+
+                // ** CHANGED LOGIC: Categorize items with capacity validation **
                 val currentTime = Timestamp.now()
                 val availableItems = mutableListOf<CartItem>()
+                val unavailableItems = mutableListOf<CartItem>()
                 val expiredItems = mutableListOf<CartItem>()
 
                 cartItems.forEach { item ->
-                    if (item.available && (item.expiresAt == null || item.expiresAt.seconds > currentTime.seconds)) {
-                        availableItems.add(item)
-                    } else {
+                    // 1. Check for expiration first
+                    if (item.expiresAt != null && item.expiresAt.seconds < currentTime.seconds) {
                         expiredItems.add(item)
+                        return@forEach // continue to next item
+                    }
+
+                    val travelPackage = packagesMap[item.packageId]?.travelPackage
+                    val departureOption = travelPackage?.packageOption?.find { it.id == item.departureId }
+
+                    // 2. Check if package or departure still exists and has capacity
+                    if (departureOption == null) {
+                        unavailableItems.add(item) // Package or date was deleted/changed
+                    } else {
+                        val availableCapacity = departureOption.capacity - departureOption.numberOfPeopleBooked
+                        if (item.totalTravelerCount > availableCapacity) {
+                            unavailableItems.add(item) // Not enough spots
+                        } else {
+                            availableItems.add(item) // Everything is OK
+                        }
                     }
                 }
 
-                val packageIds = availableItems.map { it.packageId }.toSet()
-
-                // load packages in cart
-                val packages = mutableListOf<TravelPackageWithImages?>()
-                packageIds.forEach { id ->
-                    val packageResult = travelPackageRepository.getPackageWithImages(id)
-                    packages.add(packageResult)
-                }
-
-                // set selected items to all available items
+                // Set selected items to only the available ones
                 val initialSelectedIds = availableItems.map { it.cartItemId }.toSet()
 
                 _uiState.value = CartUiState.Success(
                     cart = cart,
                     availableItems = availableItems,
+                    unavailableItems = unavailableItems, // Pass the new list
                     expiredItems = expiredItems,
                     selectedItemIds = initialSelectedIds,
-                    packages = packages
+                    packages = packagesWithImages
                 )
 
             } catch (e: Exception) {
@@ -186,32 +195,46 @@ class CartViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val packageDetails = travelPackageRepository.getTravelPackage(cartItem.packageId)
-                val pricingMap = packageDetails?.pricing
-
-                val currentItem = currentState.availableItems.find { it.cartItemId == cartItem.cartItemId }
-                if (currentItem == null) {
-                    _uiState.value = CartUiState.Error("Cart item not found")
+                val travelPackage = travelPackageRepository.getTravelPackage(cartItem.packageId)
+                if (travelPackage == null) {
+                    _uiState.value = CartUiState.Error("Could not find package details.")
                     return@launch
                 }
 
-                val adultPrice = pricingMap?.get("Adult") ?: 0.0
-                val childPrice = pricingMap?.get("Child") ?: 0.0
+                val departureOption = travelPackage.packageOption.find { it.id == cartItem.departureId }
+                if (departureOption == null) {
+                    _uiState.value = CartUiState.Error("This departure date is no longer available.")
+                    refreshCart()
+                    return@launch
+                }
+
+                val newTotalTravelers = newAdults + newChildren
+                val availableCapacity = departureOption.capacity - departureOption.numberOfPeopleBooked
+
+                if (newTotalTravelers > availableCapacity) {
+                    val errorMessage = "Cannot update. Only $availableCapacity spots left for this date."
+                    Log.e("CartViewModel", errorMessage)
+                    _uiState.value = CartUiState.Error(errorMessage)
+                    stopEditingItem()
+                    return@launch
+                }
+
+                val pricingMap = travelPackage.pricing
+                val adultPrice = pricingMap["Adult"] ?: 0.0
+                val childPrice = pricingMap["Child"] ?: 0.0
                 val newTotalPrice = (adultPrice * newAdults) + (childPrice * newChildren)
 
-                val updatedCartItem = currentItem.copy(
+                val updatedCartItem = cartItem.copy(
                     noOfAdults = newAdults,
                     noOfChildren = newChildren,
-                    totalTravelerCount = newAdults + newChildren,
+                    totalTravelerCount = newTotalTravelers,
                     totalPrice = newTotalPrice,
                     updatedAt = Timestamp.now()
                 )
 
-                // CORRECTION: Correct method call with cartId.
                 val result = cartRepository.updateCartItemInCart(cartId, updatedCartItem)
                 if (result.isSuccess) {
                     stopEditingItem()
-                    // Refresh cart to ensure all totals are recalculated and UI is consistent.
                     refreshCart()
                 } else {
                     _uiState.value = CartUiState.Error("Failed to update cart item: ${result.exceptionOrNull()?.message}")
@@ -221,6 +244,7 @@ class CartViewModel @Inject constructor(
             }
         }
     }
+
 
     fun showPackageDetails(packageId: String) {
         _uiState.update { currentState ->
@@ -255,7 +279,6 @@ class CartViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 if (currentState.cart != null) {
-                    // Re-validates the cart totals before proceeding
                     cartRepository.updateCart(currentState.cart.cartId)
                 }
             } catch (e: Exception) {

@@ -8,5 +8,5 @@ data class DepartureAndEndTime(
     val startDate: Timestamp = Timestamp.now(),
     val endDate: Timestamp = Timestamp.now(),
     val capacity: Int = 0,
-    val bookedCount: Int = 0
+    val numberOfPeopleBooked: Int = 0
 )

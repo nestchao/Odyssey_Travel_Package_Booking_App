@@ -1,3 +1,4 @@
+// src/main/java/com/example/mad_assignment/ui/wishlist/WishlistScreen.kt
 package com.example.mad_assignment.ui.wishlist
 
 import androidx.compose.foundation.background
@@ -9,7 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Delete // Import the Delete icon
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,7 +24,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.mad_assignment.data.model.TravelPackage
+// NO CHANGE to TravelPackage model import (it's not the direct list item type here)
+import com.example.mad_assignment.data.model.TravelPackageWithImages // Import this
+import coil.compose.AsyncImage // Import AsyncImage
+import coil.request.ImageRequest // Import ImageRequest
+import com.example.mad_assignment.util.toDataUri // Assuming this utility function exists
+import androidx.compose.ui.platform.LocalContext // Import LocalContext
+import androidx.compose.ui.layout.ContentScale // Import ContentScale
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -120,19 +128,19 @@ fun WishlistScreen(
                             )
                         }
 
+                        // IMPORTANT: 'travelPackage' here is actually TravelPackageWithImages
                         items(
                             items = state.wishlistPackages,
-                            key = { it.packageId }
-                        ) { travelPackage ->
+                            key = { it.travelPackage.packageId } // Key is from the nested TravelPackage
+                        ) { travelPackageWithImages -> // Changed parameter name to reflect type
                             WishlistPackageCard(
-                                travelPackage = travelPackage,
+                                travelPackageWithImages = travelPackageWithImages, // Pass the TravelPackageWithImages object
                                 onRemove = {
-                                    viewModel.removeFromWishlistByPackageId(travelPackage.packageId)
+                                    viewModel.removeFromWishlistByPackageId(travelPackageWithImages.travelPackage.packageId)
                                 },
                                 onClick = {
-                                    // Refresh before navigating to ensure latest data
-                                    viewModel.loadWishlist()
-                                    onPackageClick(travelPackage.packageId)
+                                    viewModel.loadWishlist() // Refresh before navigating
+                                    onPackageClick(travelPackageWithImages.travelPackage.packageId) // Access packageId from nested TravelPackage
                                 }
                             )
                         }
@@ -187,23 +195,31 @@ fun WishlistScreen(
 
 @Composable
 fun WishlistPackageCard(
-    travelPackage: TravelPackage,
+    travelPackageWithImages: TravelPackageWithImages, // IMPORTANT: Changed parameter type
     onRemove: () -> Unit,
     onClick: () -> Unit
 ) {
+    // Extract TravelPackage and primary image URL from TravelPackageWithImages
+    val travelPackage = travelPackageWithImages.travelPackage
+    val primaryImageUrl = travelPackageWithImages.images.firstOrNull()?.base64Data
+    val context = LocalContext.current // Get current context for ImageRequest
+
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
+            .fillMaxWidth(), // Removed .clickable here as it's now wrapped in the row
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Row(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onClick() } // Make the whole card row clickable
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically // Align items vertically
         ) {
-            // Package image placeholder or actual image
+            // Package image or placeholder
             Box(
                 modifier = Modifier
                     .size(80.dp)
@@ -218,20 +234,33 @@ fun WishlistPackageCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                // Placeholder icon
-                Icon(
-                    Icons.Outlined.Favorite,
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                )
+                // Use AsyncImage if primaryImageUrl is available
+                if (!primaryImageUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(toDataUri(primaryImageUrl)) // Use toDataUri for Base64 images
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = travelPackage.packageName,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    // Otherwise, show a placeholder icon
+                    Icon(
+                        Icons.Outlined.Favorite, // Placeholder icon for wishlist
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(16.dp))
 
             Column(
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(1f) // Takes remaining space
                     .fillMaxHeight(),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
@@ -267,7 +296,8 @@ fun WishlistPackageCard(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically
@@ -287,7 +317,6 @@ fun WishlistPackageCard(
                             )
                         }
 
-                        // Price range
                         val minPrice = travelPackage.pricing.values.minOrNull() ?: 0.0
                         if (minPrice > 0) {
                             Text(
@@ -299,6 +328,18 @@ fun WishlistPackageCard(
                         }
                     }
                 }
+            }
+
+            // Remove button
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.align(Alignment.CenterVertically) // Align to center
+            ) {
+                Icon(
+                    Icons.Default.Delete, // Changed to a more explicit delete icon
+                    contentDescription = "Remove from Wishlist",
+                    tint = MaterialTheme.colorScheme.error
+                )
             }
         }
     }

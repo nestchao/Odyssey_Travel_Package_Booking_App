@@ -1,9 +1,11 @@
+// src/main/java/com/example/mad_assignment/ui/recentlyviewed/RecentlyViewedViewModel.kt
 package com.example.mad_assignment.ui.recentlyviewed
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.mad_assignment.data.model.TravelPackage
+// NO CHANGE to TravelPackage model import, it's not directly used here for the list type
+import com.example.mad_assignment.data.model.TravelPackageWithImages // Import this
 import com.example.mad_assignment.data.repository.TravelPackageRepository
 import com.example.mad_assignment.data.repository.RecentlyViewedRepository
 import com.google.firebase.auth.FirebaseAuth
@@ -50,13 +52,14 @@ class RecentlyViewedViewModel @Inject constructor(
 
                 Log.d("RecentlyViewedVM", "Found ${recentlyViewedItems.size} recently viewed items")
 
-                val packages = mutableListOf<TravelPackage>()
+                // IMPORTANT CHANGE: Store TravelPackageWithImages directly
+                val packagesWithImages = mutableListOf<TravelPackageWithImages>()
 
                 for (item in recentlyViewedItems) {
                     try {
                         val packageData = travelPackageRepository.getPackageWithImages(item.packageId)
                         packageData?.let {
-                            packages.add(it.travelPackage)
+                            packagesWithImages.add(it) // Add the whole TravelPackageWithImages object
                             Log.d("RecentlyViewedVM", "Loaded package: ${it.travelPackage.packageName}")
                         }
                     } catch (e: Exception) {
@@ -65,13 +68,13 @@ class RecentlyViewedViewModel @Inject constructor(
                     }
                 }
 
-                if (packages.isEmpty()) {
+                if (packagesWithImages.isEmpty()) {
                     Log.w("RecentlyViewedVM", "No valid packages found from recently viewed items")
                     _uiState.value = RecentlyViewedUiState.Empty
                 } else {
-                    Log.d("RecentlyViewedVM", "Successfully loaded ${packages.size} packages")
+                    Log.d("RecentlyViewedVM", "Successfully loaded ${packagesWithImages.size} packages")
                     _uiState.value = RecentlyViewedUiState.Success(
-                        recentlyViewedPackages = packages
+                        recentlyViewedPackages = packagesWithImages // Pass the list of TravelPackageWithImages
                     )
                 }
 
