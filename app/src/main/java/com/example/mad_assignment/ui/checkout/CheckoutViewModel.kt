@@ -17,6 +17,13 @@ import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import java.util.UUID
 import javax.inject.Inject
+import androidx.lifecycle.viewModelScope
+import com.example.mad_assignment.data.model.*
+import com.example.mad_assignment.data.repository.*
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import java.util.Calendar
 
 @HiltViewModel
 class CheckoutViewModel @Inject constructor(
@@ -136,22 +143,37 @@ class CheckoutViewModel @Inject constructor(
         )
     }
 
-    fun onConfirmAndPay(paymentMethod: String) = viewModelScope.launch {
+    fun onConfirmAndPay(
+        paymentMethod: String,
+        cardholderName: String,
+        cardNumber: String,
+        expiryDate: String,
+        cvc: String
+    ) = viewModelScope.launch {
         val currentState = _uiState.value
-        // This initial check is still good for exiting early
         if (currentState !is CheckoutUiState.Success || currentState.isProcessingPayment) return@launch
 
-        // --- FIX #1: CHECK THE TYPE INSIDE THE LAMBDA ---
+        // ** ADDED VALIDATION BLOCK **
+        if (cardholderName.isBlank() || cardNumber.length != 16 || cvc.length != 3) {
+            _checkoutResult.value = CheckoutResultEvent.Failure("Please fill all payment fields correctly.")
+            return@launch
+        }
+
+        if (!isExpiryDateValid(expiryDate)) {
+            _checkoutResult.value = CheckoutResultEvent.Failure("Your card has expired or the date is invalid.")
+            return@launch
+        }
+
+        // --- Payment processing logic starts here ---
         _uiState.update { state ->
             if (state is CheckoutUiState.Success) {
                 state.copy(isProcessingPayment = true)
             } else {
-                state // Return the original state if it's not Success
+                state
             }
         }
 
         val userId = auth.currentUser?.uid ?: return@launch
-        // We can safely use currentState here because of the early return
         val totalAmount = currentState.totalPrice
 
         val initialPayment = Payment(userId = userId, amount = totalAmount, paymentMethod = paymentMethod)
@@ -191,7 +213,6 @@ class CheckoutViewModel @Inject constructor(
             }
         )
 
-        // --- FIX #2: APPLY THE SAME FIX AT THE END ---
         _uiState.update { state ->
             if (state is CheckoutUiState.Success) {
                 state.copy(isProcessingPayment = false)
@@ -263,6 +284,24 @@ class CheckoutViewModel @Inject constructor(
         // For now, let's proceed, but this is a potential future improvement.
         return bookingRepository.createBookingsFromCart(userId, cartId, cartItemsToBook, paymentId)
     }
+}
+
+private fun isExpiryDateValid(expiryDate: String): Boolean {
+    if (expiryDate.length != 4) return false
+
+    val month = expiryDate.substring(0, 2).toIntOrNull()
+    val year = expiryDate.substring(2, 4).toIntOrNull()
+
+    if (month == null || year == null || month !in 1..12) return false
+
+    val calendar = Calendar.getInstance()
+    val currentYear = calendar.get(Calendar.YEAR) % 100 // Get last two digits of the year (e.g., 24 for 2024)
+    val currentMonth = calendar.get(Calendar.MONTH) + 1 // Calendar months are 0-11
+
+    if (year < currentYear) return false // Year is in the past
+    if (year == currentYear && month < currentMonth) return false // Same year, but month is in the past
+
+    return true
 }
 
 // Helper enum for clarity

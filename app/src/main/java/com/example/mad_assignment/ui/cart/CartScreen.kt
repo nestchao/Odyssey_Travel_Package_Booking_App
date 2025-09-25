@@ -1,13 +1,9 @@
-
 package com.example.mad_assignment.ui.cart
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -18,16 +14,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -108,47 +100,41 @@ fun CartScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            when (uiState) {
-                is CartUiState.Loading -> {
-                    LoadingContent()
-                }
-                is CartUiState.Empty -> {
-                    EmptyCartContent(onPackagesClick)
-                }
-                is CartUiState.Error -> {
-                    ErrorContent(
-                        message = (uiState as CartUiState.Error).message,
-                        onRetry = { viewModel.refreshCart() }
-                    )
-                }
+            when (val state = uiState) {
+                is CartUiState.Loading -> LoadingContent()
+                is CartUiState.Empty -> EmptyCartContent(onPackagesClick) // FIXED: Re-added call
+                is CartUiState.Error -> ErrorContent(
+                    message = state.message,
+                    onRetry = { viewModel.refreshCart() }
+                )
                 is CartUiState.Success -> {
-                    val successState = uiState as CartUiState.Success
                     CartContent(
-                        state = successState,
-                        onPackageDetailsClick = { cartItem ->
+                        state = state,
+                        // FIXED: Added explicit types to all lambdas
+                        onPackageDetailsClick = { cartItem: CartItem ->
                             onPackageDetailsClick(cartItem)
                         },
-                        onQuickViewClick = { cartItem ->
+                        onQuickViewClick = { cartItem: CartItem ->
                             viewModel.showPackageDetails(cartItem.packageId)
                         },
-                        onItemSelectionToggle = { cartItemId ->
+                        onItemSelectionToggle = { cartItemId: String ->
                             viewModel.toggleItemSelection(cartItemId)
                         },
-                        onItemDelete = { cartItemId ->
+                        onItemDelete = { cartItemId: String ->
                             viewModel.removeItem(cartItemId)
                         },
-                        onItemEdit = { cartItemId ->
+                        onItemEdit = { cartItemId: String ->
                             viewModel.startEditingItem(cartItemId)
                         }
                     )
 
-                    if (successState.isEditingItem && successState.editingItem != null) {
+                    if (state.isEditingItem && state.editingItem != null) {
                         EditCartItemDialog(
-                            cartItem = successState.editingItem!!,
+                            cartItem = state.editingItem!!,
                             onDismiss = { viewModel.stopEditingItem() },
                             onSave = { adults, children ->
                                 viewModel.updateCartItemDetails(
-                                    successState.editingItem!!,
+                                    state.editingItem!!,
                                     adults,
                                     children
                                 )
@@ -156,10 +142,10 @@ fun CartScreen(
                         )
                     }
 
-                    if (successState.showPackageDetails && successState.selectedPackageId != null) {
+                    if (state.showPackageDetails && state.selectedPackageId != null) {
                         PackageDetailsDialog(
-                            packageId = successState.selectedPackageId,
-                            packageDetails = successState.selectedPackage?.travelPackage,
+                            packageId = state.selectedPackageId,
+                            packageDetails = state.selectedPackage?.travelPackage,
                             onDismiss = { viewModel.hidePackageDetails() }
                         )
                     }
@@ -169,6 +155,72 @@ fun CartScreen(
     }
 }
 
+@Composable
+private fun UnavailableCartItemCard(
+    cartItem: CartItem,
+    packageDetails: TravelPackageWithImages?,
+    onDeleteClick: () -> Unit
+) {
+    val departure = packageDetails?.travelPackage?.packageOption?.find { it.id == cartItem.departureId }
+    val availableSpots = departure?.let { it.capacity - it.numberOfPeopleBooked }?.coerceAtLeast(0) ?: 0
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Icon(
+                Icons.Outlined.ErrorOutline,
+                contentDescription = "Unavailable",
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = packageDetails?.travelPackage?.packageName ?: "Package",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "SPOTS NO LONGER AVAILABLE",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "You need ${cartItem.totalTravelerCount} spots, but only $availableSpots are left.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(
+                onClick = onDeleteClick,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    Icons.Outlined.Delete,
+                    contentDescription = "Remove unavailable item",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+// ... EditCartItemDialog, TravelerCounter, PackageDetailsDialog, LoadingContent are unchanged ...
 @Composable
 private fun EditCartItemDialog(
     cartItem: CartItem,
@@ -189,7 +241,7 @@ private fun EditCartItemDialog(
                 .padding(16.dp),
             shape = RoundedCornerShape(20.dp)
         ) {
-            LazyColumn( // Add LazyColumn here
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(24.dp)
@@ -205,7 +257,6 @@ private fun EditCartItemDialog(
                         Spacer(modifier = Modifier.height(24.dp))
                     }
                 }
-
                 item {
                     TravelerCounter(
                         label = "Adults",
@@ -215,9 +266,7 @@ private fun EditCartItemDialog(
                         minValue = 1
                     )
                 }
-
                 item { Spacer(modifier = Modifier.height(16.dp)) }
-
                 item {
                     TravelerCounter(
                         label = "Children",
@@ -227,9 +276,7 @@ private fun EditCartItemDialog(
                         minValue = 0
                     )
                 }
-
                 item { Spacer(modifier = Modifier.height(24.dp)) }
-
                 item {
                     Card(
                         colors = CardDefaults.cardColors(
@@ -261,9 +308,7 @@ private fun EditCartItemDialog(
                         }
                     }
                 }
-
                 item { Spacer(modifier = Modifier.height(24.dp)) }
-
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -275,7 +320,6 @@ private fun EditCartItemDialog(
                         ) {
                             Text("Cancel")
                         }
-
                         Button(
                             onClick = { onSave(adults, children) },
                             modifier = Modifier.weight(1f)
@@ -307,7 +351,6 @@ private fun TravelerCounter(
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Medium
         )
-
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -319,14 +362,9 @@ private fun TravelerCounter(
                 Icon(
                     Icons.Outlined.Remove,
                     contentDescription = "Decrease $label",
-                    tint = if (count > minValue) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                    }
+                    tint = if (count > minValue) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
             }
-
             Text(
                 text = count.toString(),
                 style = MaterialTheme.typography.titleMedium,
@@ -334,7 +372,6 @@ private fun TravelerCounter(
                 modifier = Modifier.widthIn(min = 32.dp),
                 textAlign = TextAlign.Center
             )
-
             IconButton(onClick = onIncrement) {
                 Icon(
                     Icons.Outlined.Add,
@@ -373,7 +410,6 @@ private fun PackageDetailsDialog(
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold
                         )
-
                         IconButton(onClick = onDismiss) {
                             Icon(
                                 Icons.Outlined.Close,
@@ -382,11 +418,7 @@ private fun PackageDetailsDialog(
                         }
                     }
                 }
-
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
+                item { Spacer(modifier = Modifier.height(16.dp)) }
                 item {
                     Card(
                         colors = CardDefaults.cardColors(
@@ -429,11 +461,7 @@ private fun PackageDetailsDialog(
                         }
                     }
                 }
-
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
+                item { Spacer(modifier = Modifier.height(16.dp)) }
                 item {
                     Button(
                         onClick = onDismiss,
@@ -469,6 +497,7 @@ private fun LoadingContent() {
     }
 }
 
+// ** FIXED: Re-added this missing composable **
 @Composable
 private fun EmptyCartContent(
     onClick: () -> Unit
@@ -567,6 +596,7 @@ private fun ErrorContent(
     }
 }
 
+// ** FIXED: Removed the duplicate CartContent and updated this one to include the unavailable section **
 @Composable
 private fun CartContent(
     state: CartUiState.Success,
@@ -599,6 +629,46 @@ private fun CartContent(
                     onSelectionToggle = { onItemSelectionToggle(cartItem.cartItemId) },
                     onDeleteClick = { onItemDelete(cartItem.cartItemId) },
                     onEditClick = { onItemEdit(cartItem.cartItemId) }
+                )
+            }
+        }
+
+        // Unavailable items section
+        if (state.unavailableItems.isNotEmpty()) {
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Outlined.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Unavailable Items",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            items(
+                items = state.unavailableItems,
+                key = { it.cartItemId }
+            ) { cartItem ->
+                val packageDetails = state.packages.find { it?.travelPackage?.packageId == cartItem.packageId }
+                UnavailableCartItemCard(
+                    cartItem = cartItem,
+                    packageDetails = packageDetails,
+                    onDeleteClick = { onItemDelete(cartItem.cartItemId) }
                 )
             }
         }
@@ -989,7 +1059,6 @@ private fun CheckoutBar(
     ) {
         Column {
             if (state.hasSelectedItems) {
-                // Summary row
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1011,12 +1080,10 @@ private fun CheckoutBar(
                         )
                     }
                 }
-
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                 )
             }
-
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1024,8 +1091,6 @@ private fun CheckoutBar(
                 horizontalArrangement = if (state.hasSelectedItems) Arrangement.spacedBy(12.dp) else Arrangement.Center
             ) {
                 if (state.hasSelectedItems) {
-                    val selectedItems = state.availableItems.filter { it.cartItemId in state.selectedItemIds }
-
                     Button(
                         onClick = { onCheckoutClick() },
                         modifier = Modifier
@@ -1079,7 +1144,6 @@ private fun CheckoutBar(
     }
 }
 
-// Helper extension function to format Timestamp
 fun Timestamp.formatDate(): String {
     val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
     return sdf.format(this.toDate())

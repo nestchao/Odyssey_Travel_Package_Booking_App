@@ -1,5 +1,11 @@
 package com.example.mad_assignment.ui.packagedetail
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -89,24 +95,16 @@ import com.example.mad_assignment.data.model.TravelPackageWithImages
 import com.example.mad_assignment.data.model.Trip
 import com.example.mad_assignment.util.toDataUri
 import com.google.firebase.Timestamp
+import com.google.gson.Gson
 import java.text.SimpleDateFormat
 import java.util.Locale
-import com.example.mad_assignment.util.toDataUri
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.net.Uri
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import android.widget.Toast
-import androidx.compose.runtime.remember
-import com.google.gson.Gson
 
 @Composable
 fun PackageDetailScreen(
     onNavigateBack: () -> Unit,
     onNavigateToCart: () -> Unit,
     onNavigateToCheckout: (packageId: String, departureId: String, paxCountsJson: String) -> Unit,
-    ) {
+) {
     val viewModel: PackageDetailViewModel = hiltViewModel()
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -192,16 +190,12 @@ fun PackageDetailScreen(
                     EnhancedBookingActionBar(
                         state = state,
                         onAddToCartClick = { viewModel.addToCart() },
-                        // ADD THE onBookNowClick HANDLER
                         onBookNowClick = {
-                            // Ensure all required data is available before navigating
                             val packageId = state.packageDetail.travelPackage.packageId
                             val departureId = state.selectedDeparture?.id
                             val paxCounts = state.paxCounts
 
                             if (departureId != null && packageId.isNotBlank()) {
-                                // Serialize the map to a JSON string to pass as a nav argument
-                                // Your old code used a custom format, JSON is more robust.
                                 val paxCountsJson = Gson().toJson(paxCounts)
                                 onNavigateToCheckout(packageId, departureId, paxCountsJson)
                             }
@@ -309,7 +303,8 @@ fun EnhancedDateSelector(
             ) {
                 items(items = departures, key = { it.id }) { departure ->
                     val isSelected = departure.id == selectedDeparture?.id
-                    val spotsLeft = departure.capacity
+                    // CORRECTED LINE: Use numberOfPeopleBooked
+                    val spotsLeft = departure.capacity - departure.numberOfPeopleBooked
                     val isSoldOut = spotsLeft <= 0
 
                     val backgroundColor by animateColorAsState(
