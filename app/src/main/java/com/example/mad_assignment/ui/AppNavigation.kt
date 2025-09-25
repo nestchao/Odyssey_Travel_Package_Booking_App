@@ -140,7 +140,6 @@ fun AppNavigation(){
                 onNavigateToRecentlyViewed = { navController.navigate("recentlyViewed") },
                 onNavigateToWishlist = { navController.navigate("wishlist") },
                 onNavigateToCart = { navController.navigate("cart") },
-                onBookingDetailsClick = { navController.navigate("bookings") }
             )
         }
 
@@ -161,7 +160,6 @@ fun AppNavigation(){
                 onNavigateToSettings = { navController.navigate("setting") }, // This is unused in tablet but kept for consistency
                 onNavigateToRecentlyViewed = { navController.navigate("recentlyViewed") },
                 onNavigateToWishlist = { navController.navigate("wishlist") },
-                onBookingDetailsClick = { navController.navigate("bookings") }
             )
         }
 
@@ -399,7 +397,6 @@ private fun TabletContainerScreen(
     // Add these lambdas to handle navigation from the settings screen
     onNavigateToChangePassword: () -> Unit,
     onNavigateToAboutUs: () -> Unit,
-    onBookingDetailsClick: (Booking) -> Unit
 ) {
     val user by mainViewModel.currentUser.collectAsState()
     val contentNavController = rememberNavController()
@@ -468,7 +465,6 @@ private fun TabletContainerScreen(
             onNavigateToWishlist = onNavigateToWishlist,
             onNavigateToRecentlyViewed = onNavigateToRecentlyViewed,
             onNavigateToCart = onNavigateToCart,
-            onBookingDetailsClick = onBookingDetailsClick
         )
     }
 }
