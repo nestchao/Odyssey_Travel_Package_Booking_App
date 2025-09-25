@@ -5,6 +5,7 @@ import com.example.mad_assignment.data.model.Payment
 import com.example.mad_assignment.data.model.PaymentStatus
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
@@ -19,6 +20,19 @@ class PaymentDataSource @Inject constructor(
     companion object {
         private const val PAYMENTS_COLLECTION = "payments"
         private const val TAG = "PaymentDataSource"
+    }
+
+    suspend fun getAllPayments(): List<Payment> {
+        return try {
+            val snapshot = firestore.collection(PAYMENTS_COLLECTION)
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .get()
+                .await()
+            snapshot.toObjects(Payment::class.java)
+        } catch (e: Exception) {
+            Log.e(TAG, "getAllPayments failed", e)
+            emptyList()
+        }
     }
 
     suspend fun createPayment(payment: Payment): Result<String> {

@@ -64,6 +64,10 @@ import com.example.mad_assignment.ui.signup.SignUpViewModel
 import com.example.mad_assignment.ui.wishlist.WishlistScreen
 import com.example.mad_assignment.ui.cart.CartScreen
 import com.example.mad_assignment.ui.checkout.CheckoutScreen
+import com.example.mad_assignment.ui.managepayment.ManagePaymentScreen
+import com.example.mad_assignment.ui.managepayment.ManagePaymentViewModel
+import com.example.mad_assignment.ui.manageuser.ManageUserScreen
+import com.example.mad_assignment.ui.manageuser.ManageUserViewModel
 import com.google.gson.Gson
 import com.example.mad_assignment.ui.cart.CartScreen
 
@@ -302,15 +306,32 @@ fun AppNavigation(){
             val viewModel: AdminDashboardViewModel = hiltViewModel()
             AdminDashboardScreen(
                 viewModel = viewModel,
-                onNavigateToUsers = { navController.navigate("admin_users") },
+                onNavigateToUsers = { navController.navigate("manage_user") },
                 onNavigateToBookings = { navController.navigate("admin_bookings") },
-                onNavigateToAnalytics = { navController.navigate("admin_analytics") },
-                onNavigateToSettings = { navController.navigate("admin_settings") },
+                onNavigateToPackage = { navController.navigate("manage") },
+                onNavigateToPayment = { navController.navigate("manage_payment") },
+                onNavigateToNotifications = { navController.navigate("notificationScheduler") },
                 onSignOut = {
                     navController.navigate("signin") {
                         popUpTo("admin_dashboard") { inclusive = true }
                     }
                 }
+            )
+        }
+        composable("manage_payment") {
+            val viewModel: ManagePaymentViewModel = hiltViewModel()
+            ManagePaymentScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+
+        composable("manage_user") {
+            val viewModel: ManageUserViewModel = hiltViewModel()
+            ManageUserScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
