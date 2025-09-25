@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mad_assignment.data.model.CartItem
-import com.example.mad_assignment.data.model.TravelPackageWithImages
 import com.example.mad_assignment.data.repository.CartRepository
 import com.example.mad_assignment.data.repository.TravelPackageRepository
 import com.google.firebase.Timestamp

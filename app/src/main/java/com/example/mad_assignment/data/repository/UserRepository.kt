@@ -55,6 +55,13 @@ class UserRepository @Inject constructor(
         return result.getOrElse { emptyList() }
     }
 
+    suspend fun updateUserType(userId: String, newType: UserType) {
+        try {
+            userDataSource.updateUserType(userId, newType)
 
+        } catch (e: Exception) {
+            throw e
+        }
+    }
 
 }

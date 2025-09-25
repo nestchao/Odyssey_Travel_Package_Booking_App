@@ -34,8 +34,9 @@ fun AdminDashboardScreen(
     viewModel: AdminDashboardViewModel = hiltViewModel(),
     onNavigateToUsers: () -> Unit = {},
     onNavigateToBookings: () -> Unit = {},
-    onNavigateToAnalytics: () -> Unit = {},
-    onNavigateToSettings: () -> Unit = {},
+    onNavigateToPackage: () -> Unit = {},
+    onNavigateToPayment: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
     onSignOut: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -95,8 +96,9 @@ fun AdminDashboardScreen(
                     state = state,
                     onNavigateToUsers = onNavigateToUsers,
                     onNavigateToBookings = onNavigateToBookings,
-                    onNavigateToAnalytics = onNavigateToAnalytics,
-                    onNavigateToSettings = onNavigateToSettings,
+                    onNavigateToPackage = onNavigateToPackage,
+                    onNavigateToPayment = onNavigateToPayment,
+                    onNavigateToNotifications = onNavigateToNotifications,
                     onSignOut = {
                         viewModel.signOut()
                         onSignOut()
@@ -118,8 +120,9 @@ private fun AdminDashboardContent(
     state: AdminDashboardUiState.Success,
     onNavigateToUsers: () -> Unit,
     onNavigateToBookings: () -> Unit,
-    onNavigateToAnalytics: () -> Unit,
-    onNavigateToSettings: () -> Unit,
+    onNavigateToPackage: () -> Unit,
+    onNavigateToPayment: () -> Unit,
+    onNavigateToNotifications: () -> Unit,
     onSignOut: () -> Unit
 ) {
     LazyColumn(
@@ -178,7 +181,7 @@ private fun AdminDashboardContent(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(getQuickActions(onNavigateToUsers, onNavigateToBookings, onNavigateToAnalytics, onNavigateToSettings)) { action ->
+                items(getQuickActions(onNavigateToUsers, onNavigateToBookings, onNavigateToPackage, onNavigateToPayment,onNavigateToNotifications)) { action ->
                     QuickActionCard(
                         title = action.title,
                         icon = action.icon,
@@ -387,7 +390,8 @@ private fun getQuickActions(
     onNavigateToUsers: () -> Unit,
     onNavigateToBookings: () -> Unit,
     onNavigateToAnalytics: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToNotifications: () -> Unit
 ): List<QuickActionData> {
     return listOf(
         QuickActionData(
@@ -397,23 +401,29 @@ private fun getQuickActions(
             onClick = onNavigateToUsers
         ),
         QuickActionData(
-            title = "View Bookings",
+            title = "Manage Bookings",
 
             icon = Icons.Filled.BookOnline,
             color = Color(0xFF3B82F6),
             onClick = onNavigateToBookings
         ),
         QuickActionData(
-            title = "Analytics",
-            icon = Icons.Filled.Analytics,
+            title = "Manage Packages",
+            icon = Icons.Filled.Inventory2,
             color = Color(0xFF8B5CF6),
             onClick = onNavigateToAnalytics
         ),
         QuickActionData(
-            title = "Settings",
-            icon = Icons.Filled.Settings,
+            title = "Manage Payment",
+            icon = Icons.Filled.Payment,
             color = Color(0xFF6B7280),
             onClick = onNavigateToSettings
+        ) ,
+        QuickActionData(
+        title = "Notification",
+        icon = Icons.Filled.Notifications,
+        color = Color(0xFFF59E0B),
+        onClick = onNavigateToNotifications
         )
     )
 }
@@ -455,7 +465,7 @@ private fun QuickActionCard(
 
             Text(
                 text = title,
-                fontSize = 11.sp,
+                fontSize = 10.sp,
                 color = Color.Black,
                 fontWeight = FontWeight.Medium,
                 maxLines = 2,
