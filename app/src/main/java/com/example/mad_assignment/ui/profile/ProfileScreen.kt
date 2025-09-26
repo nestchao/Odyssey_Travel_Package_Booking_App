@@ -51,7 +51,9 @@ fun ProfileScreen(
                     ProfileContent(
                         uiState = ProfileUiState.Success(
                             user = state.user,
-                            ProfilePic = state.ProfilePic
+                            ProfilePic = state.ProfilePic,
+                            totalTrips = 0,
+                            yearsOnOdyssey = 0
                         ),
                         onNavigateToAccountDetails = onNavigateToAccountDetails,
                         onNavigateToWishlist = onNavigateToWishlist,

@@ -125,23 +125,6 @@ fun NotificationScreenHeader(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.align(Alignment.Center)
         )
-        // check if current user is admin: if-else
-        Button(
-            onClick = { onSendClicked() },
-            shape = MaterialTheme.shapes.medium,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.surface,   // button background
-                contentColor = MaterialTheme.colorScheme.onSurface    // text & icon color
-            ),
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Send,
-                contentDescription = "Send Notification",
-                modifier = Modifier.size(20.dp)
-            )
-        }
     }
 }
 @Composable

@@ -2,6 +2,8 @@ package com.example.mad_assignment.data.repository
 
 import android.util.Log
 import com.example.mad_assignment.data.datasource.BookingDataSource
+import com.example.mad_assignment.data.model.Activity
+import com.example.mad_assignment.data.model.ActivityType
 import com.example.mad_assignment.data.model.Booking
 import com.example.mad_assignment.data.model.BookingStatus
 import com.example.mad_assignment.data.model.CartItem
@@ -10,26 +12,60 @@ import javax.inject.Singleton
 
 @Singleton
 class BookingRepository @Inject constructor(
-    private val bookingDataSource: BookingDataSource
+    private val bookingDataSource: BookingDataSource,
+    private val activityRepository: ActivityRepository
 ) {
     companion object {
         private const val TAG = "BookingRepository"
     }
 
+    suspend fun getAllBookings(): Result<List<Booking>> {
+        return bookingDataSource.getAllBookings()
+            .onFailure { Log.e(TAG, "getAllBookings failed", it) }
+    }
+
     suspend fun createBooking(newBooking: Booking): Result<String> {
-        return bookingDataSource.createBooking(newBooking)
-            .onFailure { Log.e(TAG, "createBooking failed", it) }
+        val result = bookingDataSource.createBooking(newBooking)
+
+        if (result.isSuccess) {
+            val bookingId = result.getOrNull()
+            val activity = Activity(
+                description = "New booking created. ID: $bookingId",
+                type = ActivityType.BOOKING_CREATED,
+                userId = newBooking.userId,
+                relatedId = bookingId
+            )
+            activityRepository.createActivity(activity)
+        }
+
+        return result.onFailure { Log.e(TAG, "createBooking failed", it) }
     }
 
     suspend fun createBookingsFromCart(
         userId: String,
         cartId: String,
         cartItems: List<CartItem>,
-        paymentId: String //
+        paymentId: String
     ): Result<List<String>> {
-        return bookingDataSource.createBookingsFromCart(userId, cartId, cartItems, paymentId)
-            .onFailure { Log.e(TAG, "createBookingsFromCart failed", it) }
+        val result = bookingDataSource.createBookingsFromCart(userId, cartId, cartItems, paymentId)
+
+        if (result.isSuccess) {
+            val newBookingIds = result.getOrNull() ?: emptyList()
+
+            newBookingIds.zip(cartItems).forEach { (bookingId, cartItem) ->
+                val activity = Activity(
+                    description = "New booking created from cart. ID: $bookingId",
+                    type = ActivityType.BOOKING_CREATED,
+                    userId = userId,
+                    relatedId = bookingId
+                )
+                activityRepository.createActivity(activity)
+            }
+        }
+
+        return result.onFailure { Log.e(TAG, "createBookingsFromCart failed", it) }
     }
+
 
     suspend fun deleteBooking(bookingId: String): Result<Unit> {
         return bookingDataSource.deleteBooking(bookingId)
@@ -76,8 +112,18 @@ class BookingRepository @Inject constructor(
     }
 
     suspend fun cancelBooking(bookingId: String): Result<Unit> {
-        return bookingDataSource.cancelBooking(bookingId)
-            .onFailure { Log.e(TAG, "cancelBooking failed", it) }
+        val result = bookingDataSource.cancelBooking(bookingId)
+
+        if (result.isSuccess) {
+            val activity = Activity(
+                description = "Booking cancelled. ID: $bookingId",
+                type = ActivityType.BOOKING_CANCELLED,
+                relatedId = bookingId
+            )
+            activityRepository.createActivity(activity)
+        }
+
+        return result.onFailure { Log.e(TAG, "cancelBooking failed", it) }
     }
 
     suspend fun completeBooking(bookingId: String): Result<Unit> {
@@ -100,5 +146,23 @@ class BookingRepository @Inject constructor(
     ): Result<String> {
         return bookingDataSource.createBookingFromDirectPurchase(newBooking, packageId, departureId, travelerCount)
             .onFailure { Log.e(TAG, "createBookingFromDirectPurchase failed", it) }
+    }
+
+    suspend fun countAllBookings(): Long {
+        return bookingDataSource.countAllBookings().getOrDefault(0)
+    }
+
+    suspend fun countPendingBookings(): Long {
+        return bookingDataSource.countPendingBookings().getOrDefault(0)
+    }
+
+    suspend fun getTotalRevenue(): Double {
+        return bookingDataSource.getTotalRevenue().getOrDefault(0.0)
+    }
+
+    suspend fun getTotalTrips(userId: String): Result<Int> {
+        return bookingDataSource.getTotalTripsByUserId(userId)
+            .map { it.toInt() }
+            .onFailure { Log.e(TAG, "getTotalTrips failed for user: $userId", it) }
     }
 }

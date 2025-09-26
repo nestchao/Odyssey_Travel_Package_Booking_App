@@ -64,4 +64,12 @@ class UserRepository @Inject constructor(
         }
     }
 
+    suspend fun countAllActiveUsers(): Long {
+        return userDataSource.countAllActiveUsers().getOrDefault(0)
+    }
+
+    suspend fun countNewUsersToday(): Long {
+        return userDataSource.countNewUsersToday().getOrDefault(0)
+    }
+
 }

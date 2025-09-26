@@ -3,8 +3,11 @@ package com.example.mad_assignment.ui.signup
 import android.util.Patterns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.mad_assignment.data.model.Activity
+import com.example.mad_assignment.data.model.ActivityType
 import com.example.mad_assignment.data.model.User
 import com.example.mad_assignment.data.model.UserType
+import com.example.mad_assignment.data.repository.ActivityRepository
 import com.example.mad_assignment.data.repository.ProfilePicRepository
 import com.example.mad_assignment.data.repository.UserRepository
 import com.google.firebase.auth.FirebaseAuth
@@ -23,6 +26,7 @@ import javax.inject.Inject
 class SignUpViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val profilePicRepository: ProfilePicRepository,
+    private val activityRepository: ActivityRepository,
     private val auth: FirebaseAuth
 ) : ViewModel() { // Removed the empty parentheses
 
@@ -145,10 +149,19 @@ class SignUpViewModel @Inject constructor(
                     lastName = lastName,
                     userEmail = email.trim(),
                     userPhoneNumber = phoneNumber,
-                    userType = UserType.CUSTOMER
+                    userType = UserType.CUSTOMER,
+                    isActive = true
                 )
 
                 userRepository.createUser(newUser)
+
+                val activity = Activity(
+                    description = "New user registered: ${newUser.userEmail}",
+                    type = ActivityType.USER_REGISTRATION,
+                    userId = newUser.userID
+                )
+
+                activityRepository.createActivity(activity)
 
                 profilePicRepository.setProfilePicture(
                     userId = firebaseUser.uid,

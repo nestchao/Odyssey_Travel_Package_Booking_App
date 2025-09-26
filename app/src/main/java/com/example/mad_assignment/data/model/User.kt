@@ -12,7 +12,8 @@ data class User(
     val userEmail: String = "",
     val userPhoneNumber: String = "",
     val userType: UserType = UserType.CUSTOMER,
-    @ServerTimestamp val createdAt: Timestamp? = null
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    val isActive: Boolean = true
 )
 
 enum class UserType {

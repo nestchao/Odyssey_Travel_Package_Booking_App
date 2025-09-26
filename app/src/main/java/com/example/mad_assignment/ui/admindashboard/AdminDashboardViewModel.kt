@@ -2,19 +2,27 @@ package com.example.mad_assignment.ui.admindashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.mad_assignment.data.repository.ActivityRepository
+import com.example.mad_assignment.data.repository.BookingRepository
 import com.example.mad_assignment.data.repository.UserRepository
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 @HiltViewModel
 class AdminDashboardViewModel @Inject constructor(
     private val userRepository: UserRepository,
+    private val bookingRepository: BookingRepository,
+    private val activityRepository: ActivityRepository,
     private val auth: FirebaseAuth
 ) : ViewModel() {
 
@@ -40,8 +48,12 @@ class AdminDashboardViewModel @Inject constructor(
             try {
                 val user = userRepository.getUserById(currentUser.uid)
                 if (user != null && user.userType == com.example.mad_assignment.data.model.UserType.ADMIN) {
-                    val stats = loadDashboardStats()
-                    val activities = loadRecentActivities()
+
+                    val (stats, activities) = coroutineScope {
+                        val statsDeferred = async { loadDashboardStats() }
+                        val activitiesDeferred = async { loadRecentActivities() }
+                        statsDeferred.await() to activitiesDeferred.await()
+                    }
 
                     _uiState.value = AdminDashboardUiState.Success(
                         currentUser = user,
@@ -89,51 +101,53 @@ class AdminDashboardViewModel @Inject constructor(
     }
 
     private suspend fun loadDashboardStats(): DashboardStats {
-        // In a real app, you would fetch this from your repositories
-        return DashboardStats(
-            totalUsers = 1250,
-            totalBookings = 3420,
-            totalRevenue = 125000.50,
-            activeUsers = 892,
-            newUsersToday = 23,
-            pendingBookings = 45
-        )
+        return coroutineScope {
+            val totalUsersDeferred = async { userRepository.countAllActiveUsers() }
+            val newUsersTodayDeferred = async { userRepository.countNewUsersToday() }
+            val totalBookingsDeferred = async { bookingRepository.countAllBookings() }
+            val pendingBookingsDeferred = async { bookingRepository.countPendingBookings() }
+            val totalRevenueDeferred = async { bookingRepository.getTotalRevenue() }
+
+            DashboardStats(
+                totalUsers = totalUsersDeferred.await().toInt(),
+                newUsersToday = newUsersTodayDeferred.await().toInt(),
+                totalBookings = totalBookingsDeferred.await().toInt(),
+                pendingBookings = pendingBookingsDeferred.await().toInt(),
+                totalRevenue = totalRevenueDeferred.await(),
+                activeUsers = totalUsersDeferred.await().toInt()
+            )
+        }
     }
 
     private suspend fun loadRecentActivities(): List<RecentActivity> {
-        // In a real app, you would fetch this from your repositories
-        return listOf(
+        val activitiesFromRepo = activityRepository.getRecentActivities()
+
+        return activitiesFromRepo.map { activity ->
             RecentActivity(
-                id = "1",
-                type = ActivityType.USER_REGISTRATION,
-                description = "New user registered: john.doe@email.com",
-                timestamp = "2 minutes ago"
-            ),
-            RecentActivity(
-                id = "2",
-                type = ActivityType.BOOKING_CREATED,
-                description = "New booking created for Bali Package",
-                timestamp = "5 minutes ago"
-            ),
-            RecentActivity(
-                id = "3",
-                type = ActivityType.PAYMENT_COMPLETED,
-                description = "Payment completed: $2,350.00",
-                timestamp = "12 minutes ago"
-            ),
-            RecentActivity(
-                id = "4",
-                type = ActivityType.BOOKING_CANCELLED,
-                description = "Booking cancelled: Japan Tour",
-                timestamp = "1 hour ago"
-            ),
-            RecentActivity(
-                id = "5",
-                type = ActivityType.USER_UPDATED,
-                description = "User profile updated",
-                timestamp = "2 hours ago"
+                id = activity.id,
+                type = ActivityType.valueOf(activity.type.name),
+                description = activity.description,
+                timestamp = formatTimestamp(activity.timestamp)
             )
-        )
+        }
+    }
+
+    private fun formatTimestamp(timestamp: Timestamp?): String {
+        if (timestamp == null) return "Just now"
+        val now = System.currentTimeMillis()
+        val time = timestamp.toDate().time
+        val diff = now - time
+
+        val minutes = TimeUnit.MILLISECONDS.toMinutes(diff)
+        val hours = TimeUnit.MILLISECONDS.toHours(diff)
+        val days = TimeUnit.MILLISECONDS.toDays(diff)
+
+        return when {
+            minutes < 1 -> "Just now"
+            minutes < 60 -> "$minutes minutes ago"
+            hours < 24 -> "$hours hours ago"
+            else -> "$days days ago"
+        }
     }
 
     fun signOut() {

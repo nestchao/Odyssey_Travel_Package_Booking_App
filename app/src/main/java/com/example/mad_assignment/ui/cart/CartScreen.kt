@@ -102,7 +102,7 @@ fun CartScreen(
         ) {
             when (val state = uiState) {
                 is CartUiState.Loading -> LoadingContent()
-                is CartUiState.Empty -> EmptyCartContent(onPackagesClick) // FIXED: Re-added call
+                is CartUiState.Empty -> EmptyCartContent(onClick = onPackagesClick) // FIXED: Re-added call
                 is CartUiState.Error -> ErrorContent(
                     message = state.message,
                     onRetry = { viewModel.refreshCart() }

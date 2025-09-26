@@ -2,6 +2,8 @@ package com.example.mad_assignment.data.datasource
 
 import com.example.mad_assignment.data.model.User
 import com.example.mad_assignment.data.model.UserType
+import com.google.firebase.Timestamp
+import com.google.firebase.firestore.AggregateSource
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.toObjects
@@ -11,6 +13,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import java.util.Calendar
 
 @Singleton
 class UserDataSource @Inject constructor(
@@ -23,17 +26,16 @@ class UserDataSource @Inject constructor(
     fun getUserStream(userId: String): Flow<Result<User>> = callbackFlow {
         val docRef = firestore.collection(USERS_COLLECTION).document(userId)
 
-        // addSnapshotListener is the key. It stays active and runs whenever data changes.
         val listener = docRef.addSnapshotListener { snapshot, error ->
             if (error != null) {
-                trySend(Result.failure(error)) // Send error to the flow
-                close(error)                   // Close the flow
+                trySend(Result.failure(error))
+                close(error)
                 return@addSnapshotListener
             }
             if (snapshot != null && snapshot.exists()) {
                 val user = snapshot.toObject(User::class.java)
                 if (user != null) {
-                    trySend(Result.success(user)) // Send successful data to the flow
+                    trySend(Result.success(user))
                 } else {
                     trySend(Result.failure(Exception("Failed to parse user data")))
                 }
@@ -41,7 +43,7 @@ class UserDataSource @Inject constructor(
                 trySend(Result.failure(Exception("User document does not exist")))
             }
         }
-        // This is crucial: when the flow is cancelled, remove the listener to prevent memory leaks.
+
         awaitClose { listener.remove() }
     }
 
@@ -49,6 +51,7 @@ class UserDataSource @Inject constructor(
     suspend fun getAllUsers(): Result<List<User>> {
         return try {
             val snapshot = firestore.collection(USERS_COLLECTION)
+                .whereEqualTo("isActive", true)
                 .get()
                 .await()
                 .toObjects<User>()
@@ -76,7 +79,8 @@ class UserDataSource @Inject constructor(
     suspend fun getUsersByType(userType: UserType): Result<List<User>> {
         return try {
             val snapshot = firestore.collection(USERS_COLLECTION)
-                .whereEqualTo("userType", userType.name) // enum stored as string
+                .whereEqualTo("userType", userType.name)
+                .whereEqualTo("isActive", true)
                 .get()
                 .await()
             val users = snapshot.toObjects<User>()
@@ -116,7 +120,7 @@ class UserDataSource @Inject constructor(
         return try {
             firestore.collection(USERS_COLLECTION)
                 .document(userId)
-                .delete()
+                .update("isActive", false)
                 .await()
             Result.success(Unit)
         } catch (e: Exception) {
@@ -130,6 +134,7 @@ class UserDataSource @Inject constructor(
         return try {
             val snapshot = firestore.collection(USERS_COLLECTION)
                 .whereIn(FieldPath.documentId(), ids)
+                .whereEqualTo("isActive", true)
                 .get()
                 .await()
             val users = snapshot.toObjects<User>()
@@ -147,6 +152,36 @@ class UserDataSource @Inject constructor(
 
         } catch (e: Exception) {
             throw e
+        }
+    }
+
+    suspend fun countAllActiveUsers(): Result<Long> {
+        return try {
+            val countQuery = firestore.collection(USERS_COLLECTION)
+                .whereEqualTo("isActive", true)
+            val snapshot = countQuery.count().get(AggregateSource.SERVER).await()
+            Result.success(snapshot.count)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun countNewUsersToday(): Result<Long> {
+        return try {
+            val calendar = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val startOfToday = Timestamp(calendar.time)
+
+            val countQuery = firestore.collection(USERS_COLLECTION)
+                .whereGreaterThanOrEqualTo("createdAt", startOfToday)
+            val snapshot = countQuery.count().get(AggregateSource.SERVER).await()
+            Result.success(snapshot.count)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 

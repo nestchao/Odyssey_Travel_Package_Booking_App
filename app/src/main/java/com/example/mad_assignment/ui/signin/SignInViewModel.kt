@@ -129,8 +129,17 @@ class SignInViewModel @Inject constructor(
         try {
             var user = userRepository.getUserById(userId)
 
-            // If user is null, they exist in Auth but not in our database. Create them.
-            if (user == null) {
+            if (user != null) {
+                if (!user.isActive) {
+                    auth.signOut()
+                    _uiState.value = SignInUiState.Error(
+                        message = "Your account has been deactivated. Please contact support."
+                    )
+                    return
+                }
+            }
+
+            else {
                 val nameParts = name?.trim()?.split(" ", limit = 2) ?: listOf()
                 val firstName = nameParts.getOrNull(0) ?: ""
                 val lastName = nameParts.getOrNull(1) ?: ""
@@ -140,7 +149,8 @@ class SignInViewModel @Inject constructor(
                     firstName = firstName,
                     lastName = lastName,
                     userEmail = email ?: "no-email@example.com",
-                    userType = UserType.CUSTOMER
+                    userType = UserType.CUSTOMER,
+                    isActive = true
                 )
                 userRepository.createUser(newUser)
 
@@ -151,6 +161,7 @@ class SignInViewModel @Inject constructor(
 
                 user = newUser
             }
+
             _uiState.value = SignInUiState.Success(user = user)
 
         } catch (e: Exception) {
