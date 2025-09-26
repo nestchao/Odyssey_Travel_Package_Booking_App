@@ -33,9 +33,7 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, true)
         setContent {
             MAD_ASSIGNMENTTheme {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    AppNavigation()
-                }
+                AppNavigation()
             }
         }
     }
