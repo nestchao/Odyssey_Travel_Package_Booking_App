@@ -620,6 +620,18 @@ fun TabletHomeHeader(
     onBellClick: () -> Unit,
     onNavigateToProfile: () -> Unit
 ) {
+    val notificationViewModel: NotificationsViewModel = viewModel(
+        factory = NotificationsViewModelFactory(
+            NotificationRepository(
+                NotificationsDataSource(FirebaseFirestore.getInstance()),
+                ScheduledNotificationDataSource(FirebaseFirestore.getInstance()),
+                LocalContext.current
+            ),
+            LocalContext.current
+        )
+    )
+    val unreadCount by notificationViewModel.unreadCount.collectAsState()
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -667,7 +679,7 @@ fun TabletHomeHeader(
                         TabletActionButton(
                             icon = Icons.Outlined.Notifications,
                             badge = true,
-                            badgeText = "3", // This can be dynamic later
+                            badgeText = unreadCount.toString(),
                             onClick = onBellClick
                         )
                         TabletActionButton(
@@ -734,7 +746,7 @@ fun TabletHomeHeader(
                         TabletActionButton(
                             icon = Icons.Outlined.Notifications,
                             badge = true,
-                            badgeText = "3",
+                            badgeText = unreadCount.toString(),
                             onClick = onBellClick
                         )
                     }
