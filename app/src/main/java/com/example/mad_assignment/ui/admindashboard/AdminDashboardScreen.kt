@@ -311,7 +311,7 @@ private fun getStatCards(stats: DashboardStats): List<StatCardData> {
         ),
         StatCardData(
             title = "Revenue",
-            value = "RM${String.format("%.0f", stats.totalRevenue)}",
+            value = "RM ${String.format("%.0f", stats.totalRevenue)}",
             icon = Icons.Filled.AttachMoney,
             color = Color(0xFF8B5CF6),
             onClick = {}

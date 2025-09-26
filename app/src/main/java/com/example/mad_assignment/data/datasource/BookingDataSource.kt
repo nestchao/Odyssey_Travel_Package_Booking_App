@@ -463,4 +463,18 @@ class BookingDataSource @Inject constructor(
             Result.failure(e)
         }
     }
+
+    suspend fun getTotalTripsByUserId(userId: String): Result<Long> {
+        return try {
+            val snapshot = firestore.collection(BOOKINGS_COLLECTION)
+                .whereEqualTo("userId", userId)
+                .count()
+                .get(AggregateSource.SERVER)
+                .await()
+            Result.success(snapshot.count)
+        } catch (e: Exception) {
+            Log.e(TAG, "getTotalTripsByUserId failed for user: $userId", e)
+            Result.failure(e)
+        }
+    }
 }

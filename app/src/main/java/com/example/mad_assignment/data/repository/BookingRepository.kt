@@ -159,4 +159,10 @@ class BookingRepository @Inject constructor(
     suspend fun getTotalRevenue(): Double {
         return bookingDataSource.getTotalRevenue().getOrDefault(0.0)
     }
+
+    suspend fun getTotalTrips(userId: String): Result<Int> {
+        return bookingDataSource.getTotalTripsByUserId(userId)
+            .map { it.toInt() }
+            .onFailure { Log.e(TAG, "getTotalTrips failed for user: $userId", it) }
+    }
 }

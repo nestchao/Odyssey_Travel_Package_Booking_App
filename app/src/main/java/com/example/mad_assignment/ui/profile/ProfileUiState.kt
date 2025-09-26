@@ -10,7 +10,9 @@ sealed interface ProfileUiState {
 
     data class Success(
         val user: User,
-        val ProfilePic: ProfilePic
+        val ProfilePic: ProfilePic,
+        val totalTrips: Int,
+        val yearsOnOdyssey: Int
     ) : ProfileUiState {
         val displayName: String
             get() {
@@ -19,8 +21,6 @@ sealed interface ProfileUiState {
             }
         val shortDisplayName: String get() = displayName.take(12)
         val isNameTruncated: Boolean get() = displayName.length > 12
-        val totalTrips: Int get() = 0
-        val yearsOnOdyssey: Int get() = 0
 
     }
 
