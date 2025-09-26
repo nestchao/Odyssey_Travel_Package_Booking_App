@@ -12,6 +12,17 @@ import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
+// Helper function to convert the data class to a map Firestore understands perfectly
+fun com.example.mad_assignment.data.model.DepartureAndEndTime.toMap(): Map<String, Any> {
+    return mapOf(
+        "id" to this.id,
+        "startDate" to this.startDate,
+        "endDate" to this.endDate,
+        "capacity" to this.capacity,
+        "numberOfPeopleBooked" to this.numberOfPeopleBooked
+    )
+}
+
 @Singleton
 class BookingDataSource @Inject constructor(
     private val firestore: FirebaseFirestore
@@ -21,6 +32,8 @@ class BookingDataSource @Inject constructor(
         private const val CARTS_COLLECTION = "carts"
         private const val CART_ITEMS_COLLECTION = "cartItems"
         private const val PACKAGES_COLLECTION = "packages"
+        // Add the payments collection constant
+        private const val PAYMENTS_COLLECTION = "payments"
         private const val TAG = "BookingDataSource"
     }
 
@@ -50,7 +63,6 @@ class BookingDataSource @Inject constructor(
             firestore.runTransaction { transaction ->
                 val bookedItemIds = cartItems.map { it.cartItemId }.toSet()
 
-                // PHASE 1: ALL READS AND PRE-FLIGHT CHECKS
                 val cartRef = firestore.collection(CARTS_COLLECTION).document(cartId)
                 val cartSnapshot = transaction.get(cartRef)
                 val currentCart = cartSnapshot.toObject(com.example.mad_assignment.data.model.Cart::class.java)
@@ -73,21 +85,19 @@ class BookingDataSource @Inject constructor(
                     val departureOption = travelPackage.packageOption.find { it.id == cartItem.departureId }
                         ?: throw FirebaseFirestoreException("Departure option with ID ${cartItem.departureId} not found in package.", FirebaseFirestoreException.Code.NOT_FOUND)
 
-                    // IMPORTANT: Use numberOfPeopleBooked here
                     val availableCapacity = departureOption.capacity - departureOption.numberOfPeopleBooked
                     if (availableCapacity < cartItem.totalTravelerCount) {
                         throw FirebaseFirestoreException("Insufficient capacity for package ${cartItem.packageId}", FirebaseFirestoreException.Code.ABORTED)
                     }
                 }
 
-                // PHASE 2: ALL WRITES
                 val bookingIds = mutableListOf<String>()
 
-                // 1. Create all booking documents
                 for (cartItem in cartItems) {
                     val newBookingRef = firestore.collection(BOOKINGS_COLLECTION).document()
                     val newBooking = Booking(
                         bookingId = newBookingRef.id, userId = userId, packageId = cartItem.packageId,
+                        departureId = cartItem.departureId,
                         paymentId = paymentId, noOfAdults = cartItem.noOfAdults,
                         noOfChildren = cartItem.noOfChildren, totalTravelerCount = cartItem.totalTravelerCount,
                         subtotal = cartItem.basePrice, totalAmount = cartItem.totalPrice,
@@ -98,7 +108,6 @@ class BookingDataSource @Inject constructor(
                     bookingIds.add(newBookingRef.id)
                 }
 
-                // 2. Update all package capacities
                 for ((pkgId, itemsInPackage) in cartItemsByPackage) {
                     val packageRef = firestore.collection(PACKAGES_COLLECTION).document(pkgId)
                     val originalPackage = packageDataMap[pkgId]!!
@@ -108,14 +117,14 @@ class BookingDataSource @Inject constructor(
                         val optionIndex = updatedOptions.indexOfFirst { it.id == cartItem.departureId }
                         if (optionIndex != -1) {
                             val oldOption = updatedOptions[optionIndex]
-                            // IMPORTANT: Update numberOfPeopleBooked with totalTravelerCount
                             updatedOptions[optionIndex] = oldOption.copy(numberOfPeopleBooked = oldOption.numberOfPeopleBooked + cartItem.totalTravelerCount)
                         }
                     }
-                    transaction.update(packageRef, "packageOption", updatedOptions)
+
+                    val optionsAsMaps = updatedOptions.map { it.toMap() }
+                    transaction.update(packageRef, "packageOption", optionsAsMaps)
                 }
 
-                // 3. Update the cart document
                 val remainingItemIds = currentCart.cartItemIds.filter { it !in bookedItemIds }
                 val newTotalAmount = currentCart.totalAmount - priceOfBookedItems
                 transaction.update(cartRef, mapOf(
@@ -126,7 +135,6 @@ class BookingDataSource @Inject constructor(
                     "isValid" to remainingItemIds.isNotEmpty()
                 ))
 
-                // 4. Delete the individual cart item documents
                 for (cartItem in cartItems) {
                     val cartItemRef = firestore.collection(CART_ITEMS_COLLECTION).document(cartItem.cartItemId)
                     transaction.delete(cartItemRef)
@@ -240,20 +248,13 @@ class BookingDataSource @Inject constructor(
                 val booking = bookingSnapshot.toObject(Booking::class.java)
                     ?: throw Exception("Booking not found.")
 
-                // Handle refund logic for cancelled paid bookings
                 if (booking.status == BookingStatus.PAID && newStatus == BookingStatus.CANCELLED) {
-                    // TODO: payment module process refund
-                    // ALSO: If this cancellation is successful and a refund is issued,
-                    // you would typically want to release the capacity back to the package.
-                    // This involves finding the associated DepartureAndEndTime and
-                    // decrementing its numberOfPeopleBooked by booking.totalTravelerCount.
                     transaction.update(
                         bookingRef,
                         "status", BookingStatus.REFUNDED.name,
                         "updatedAt", Timestamp.now()
                     )
                 } else {
-                    // Only update status if it's not a paid -> cancelled flow leading to REFUNDED
                     transaction.update(
                         bookingRef,
                         "status", newStatus.name,
@@ -273,22 +274,68 @@ class BookingDataSource @Inject constructor(
                 val bookingRef = firestore.collection(BOOKINGS_COLLECTION).document(bookingId)
                 val bookingSnapshot = transaction.get(bookingRef)
                 val booking = bookingSnapshot.toObject(Booking::class.java)
-                    ?: throw Exception("Booking not found.")
+                    ?: throw FirebaseFirestoreException("Booking not found.", FirebaseFirestoreException.Code.NOT_FOUND)
 
-                // check if booking can be cancelled
+                Log.d(TAG, "Cancelling Booking ID: ${booking.bookingId} for Package ID: ${booking.packageId}")
+                Log.d(TAG, "Departure ID: ${booking.departureId}, Travelers to refund: ${booking.totalTravelerCount}")
+
                 if (booking.status == BookingStatus.COMPLETED || booking.status == BookingStatus.CANCELLED || booking.status == BookingStatus.REFUNDED) {
                     throw Exception("Cannot cancel booking with status: ${booking.status}")
                 }
 
-                val newStatus = if (booking.status == BookingStatus.PAID || booking.status == BookingStatus.CONFIRMED) {
-                    // TODO: payment module process refund (this would be where the `numberOfPeopleBooked` is decremented)
-                    // If a refund is processed, the status might go to REFUNDED
-                    // For now, setting to CANCELLED and leaving a note for capacity adjustment
-                    // You would need to add a `departureId` to your `Booking` model to make this work seamlessly.
-                    BookingStatus.CANCELLED // Or REFUNDED if payment is processed
+                if (booking.packageId.isNotBlank() && booking.departureId.isNotBlank()) {
+                    val packageRef = firestore.collection(PACKAGES_COLLECTION).document(booking.packageId)
+                    val packageSnapshot = transaction.get(packageRef)
+                    val travelPackage = packageSnapshot.toObject(TravelPackage::class.java)
+                        ?: throw FirebaseFirestoreException("Associated package ${booking.packageId} not found.", FirebaseFirestoreException.Code.NOT_FOUND)
+
+                    Log.d(TAG, "Package found. Current options: ${travelPackage.packageOption}")
+
+                    var wasOptionFound = false
+                    val updatedOptions = travelPackage.packageOption.map { option ->
+                        if (option.id == booking.departureId) {
+                            wasOptionFound = true
+                            Log.d(TAG, "Found matching departure option. Before: ${option.numberOfPeopleBooked} booked.")
+                            val newBookedCount = (option.numberOfPeopleBooked - booking.totalTravelerCount).coerceAtLeast(0)
+                            Log.d(TAG, "After cancellation, new booked count will be: $newBookedCount")
+                            option.copy(numberOfPeopleBooked = newBookedCount)
+                        } else {
+                            option
+                        }
+                    }
+
+                    if (!wasOptionFound) {
+                        Log.w(TAG, "Could not find matching departureId '${booking.departureId}' in package options.")
+                    } else {
+                        val optionsAsMaps = updatedOptions.map { it.toMap() }
+                        Log.d(TAG, "Updating package with new options map: $optionsAsMaps")
+                        transaction.update(packageRef, "packageOption", optionsAsMaps)
+                    }
+
                 } else {
-                    BookingStatus.CANCELLED
+                    Log.w(TAG, "Cannot release package capacity for booking $bookingId: packageId or departureId is missing.")
                 }
+
+                val newStatus: BookingStatus
+                if (booking.status == BookingStatus.PAID || booking.status == BookingStatus.CONFIRMED) {
+                    newStatus = BookingStatus.REFUNDED
+
+                    // If a refund is happening, update the payment document as well.
+                    if (booking.paymentId.isNotBlank()) {
+                        val paymentRef = firestore.collection(PAYMENTS_COLLECTION).document(booking.paymentId)
+                        transaction.update(paymentRef, mapOf(
+                            "status" to com.example.mad_assignment.data.model.PaymentStatus.REFUNDED.name,
+                            "updatedAt" to Timestamp.now()
+                        ))
+                        Log.d(TAG, "Updating payment ${booking.paymentId} to REFUNDED.")
+                    } else {
+                        Log.w(TAG, "Booking ${booking.bookingId} was paid but has no paymentId. Cannot update payment status.")
+                    }
+                } else {
+                    newStatus = BookingStatus.CANCELLED
+                }
+
+                Log.d(TAG, "Setting booking status to: ${newStatus.name}")
 
                 transaction.update(
                     bookingRef,
@@ -297,12 +344,11 @@ class BookingDataSource @Inject constructor(
                 )
             }.await().let { Result.success(Unit) }
         } catch (e: Exception) {
-            Log.e(TAG, "cancelBooking failed", e)
+            Log.e(TAG, "cancelBooking transaction failed", e)
             Result.failure(RuntimeException("Failed to cancel booking", e))
         }
     }
 
-    // *** NEW FUNCTION ADDED HERE ***
     suspend fun completeBooking(bookingId: String): Result<Unit> {
         return try {
             firestore.runTransaction { transaction ->
@@ -311,7 +357,6 @@ class BookingDataSource @Inject constructor(
                 val booking = bookingSnapshot.toObject(Booking::class.java)
                     ?: throw Exception("Booking not found.")
 
-                // check if booking can be completed
                 if (booking.status != BookingStatus.PAID && booking.status != BookingStatus.CONFIRMED) {
                     throw Exception("Cannot complete booking with status: ${booking.status}")
                 }
@@ -332,7 +377,7 @@ class BookingDataSource @Inject constructor(
         return try {
             val now = Timestamp.now()
             val querySnapshot = firestore.collection(BOOKINGS_COLLECTION)
-                .whereLessThan("startBookingDate", now) // Changed from "departureDate"
+                .whereLessThan("startBookingDate", now)
                 .whereIn("status", listOf(BookingStatus.PAID.name, BookingStatus.CONFIRMED.name))
                 .get()
                 .await()
@@ -378,9 +423,13 @@ class BookingDataSource @Inject constructor(
                 }
                 val travelPackage = packageDoc.toObject(TravelPackage::class.java)!!
 
+                Log.d(TAG, "Direct Purchase: Found package. Current options: ${travelPackage.packageOption}")
+
+                var wasOptionFound = false
                 val updatedPackageOptions = travelPackage.packageOption.map { option ->
                     if (option.id == departureId) {
-                        // IMPORTANT: Use numberOfPeopleBooked here
+                        wasOptionFound = true
+                        Log.d(TAG, "Direct Purchase: Found option. Before: ${option.numberOfPeopleBooked} booked.")
                         val availableCapacity = option.capacity - option.numberOfPeopleBooked
                         if (availableCapacity < travelerCount) {
                             throw FirebaseFirestoreException(
@@ -388,21 +437,24 @@ class BookingDataSource @Inject constructor(
                                 FirebaseFirestoreException.Code.ABORTED
                             )
                         }
-                        // IMPORTANT: Update numberOfPeopleBooked
-                        option.copy(numberOfPeopleBooked = option.numberOfPeopleBooked + travelerCount)
+                        val newBookedCount = option.numberOfPeopleBooked + travelerCount
+                        Log.d(TAG, "Direct Purchase: After booking, new booked count will be: $newBookedCount")
+                        option.copy(numberOfPeopleBooked = newBookedCount)
                     } else {
                         option
                     }
                 }
 
-                if (travelPackage.packageOption.none { it.id == departureId }) {
+                if (!wasOptionFound) {
                     throw FirebaseFirestoreException("Departure option not found for the selected dates.", FirebaseFirestoreException.Code.NOT_FOUND)
                 }
 
                 val newBookingRef = firestore.collection(BOOKINGS_COLLECTION).document(newBooking.bookingId)
                 transaction.set(newBookingRef, newBooking)
 
-                transaction.update(packageRef, "packageOption", updatedPackageOptions)
+                val optionsAsMaps = updatedPackageOptions.map { it.toMap() }
+                Log.d(TAG, "Direct Purchase: Updating package with new options map: $optionsAsMaps")
+                transaction.update(packageRef, "packageOption", optionsAsMaps)
 
                 newBooking.bookingId
             }.await().let { Result.success(it) }
