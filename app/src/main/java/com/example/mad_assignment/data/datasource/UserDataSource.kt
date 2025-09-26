@@ -51,7 +51,7 @@ class UserDataSource @Inject constructor(
     suspend fun getAllUsers(): Result<List<User>> {
         return try {
             val snapshot = firestore.collection(USERS_COLLECTION)
-                .whereEqualTo("isActive", true)
+                .whereEqualTo("active", true)
                 .get()
                 .await()
                 .toObjects<User>()
@@ -80,7 +80,7 @@ class UserDataSource @Inject constructor(
         return try {
             val snapshot = firestore.collection(USERS_COLLECTION)
                 .whereEqualTo("userType", userType.name)
-                .whereEqualTo("isActive", true)
+                .whereEqualTo("active", true)
                 .get()
                 .await()
             val users = snapshot.toObjects<User>()
@@ -120,7 +120,7 @@ class UserDataSource @Inject constructor(
         return try {
             firestore.collection(USERS_COLLECTION)
                 .document(userId)
-                .update("isActive", false)
+                .update("active", false)
                 .await()
             Result.success(Unit)
         } catch (e: Exception) {
@@ -134,7 +134,7 @@ class UserDataSource @Inject constructor(
         return try {
             val snapshot = firestore.collection(USERS_COLLECTION)
                 .whereIn(FieldPath.documentId(), ids)
-                .whereEqualTo("isActive", true)
+                .whereEqualTo("active", true)
                 .get()
                 .await()
             val users = snapshot.toObjects<User>()
@@ -158,7 +158,7 @@ class UserDataSource @Inject constructor(
     suspend fun countAllActiveUsers(): Result<Long> {
         return try {
             val countQuery = firestore.collection(USERS_COLLECTION)
-                .whereEqualTo("isActive", true)
+                .whereEqualTo("active", true)
             val snapshot = countQuery.count().get(AggregateSource.SERVER).await()
             Result.success(snapshot.count)
         } catch (e: Exception) {
