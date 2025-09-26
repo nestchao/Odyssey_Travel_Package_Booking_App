@@ -7,7 +7,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 
 class CreditCardVisualTransformation : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
-        // Format as XXXX XXXX XXXX XXXX
         val trimmed = if (text.text.length >= 16) text.text.substring(0..15) else text.text
         var out = ""
         for (i in trimmed.indices) {
