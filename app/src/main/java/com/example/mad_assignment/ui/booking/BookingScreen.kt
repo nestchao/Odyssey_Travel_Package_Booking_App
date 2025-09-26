@@ -36,6 +36,15 @@ import com.example.mad_assignment.util.toDataUri
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.*
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +64,26 @@ fun BookingsScreen(
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Bold
                     )
+                },
+                actions = {
+                    val context = LocalContext.current
+
+                    IconButton(
+                        onClick = {
+                            val calendarUrl = "https://calendar.google.com"
+
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(calendarUrl))
+
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarMonth,
+                            contentDescription = "Open Google Calendar",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
