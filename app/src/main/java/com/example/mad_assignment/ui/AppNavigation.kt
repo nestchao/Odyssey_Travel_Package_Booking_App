@@ -38,6 +38,7 @@ import com.example.mad_assignment.ui.accountdetail.AccountDetailsViewModel
 import com.example.mad_assignment.ui.admindashboard.AdminDashboardScreen
 import com.example.mad_assignment.ui.admindashboard.AdminDashboardViewModel
 import com.example.mad_assignment.ui.booking.BookingsScreen
+import com.example.mad_assignment.ui.booking.UpcomingBookingsScreen
 import com.example.mad_assignment.ui.changepassword.ChangePasswordScreen
 import com.example.mad_assignment.ui.changepassword.ChangePasswordViewModel
 import com.example.mad_assignment.ui.explore.ExploreScreen
@@ -197,7 +198,7 @@ fun AppNavigation(){
             CartScreen(
                 onBackClick = { navController.popBackStack() },
                 onPackageDetailsClick = { cartItem -> navController.navigate("detail/${cartItem.packageId}") },
-                onPackagesClick = { navController.navigate("home") },
+                onPackagesClick = {  navController.popBackStack() },
                 onCheckoutClick = { cartId, selectedItemIds ->
                     val selectedItemIdsJson = Gson().toJson(selectedItemIds)
                     val encodedSelectedItemIds = java.net.URLEncoder.encode(selectedItemIdsJson, "UTF-8")
@@ -402,10 +403,27 @@ private fun PhoneContainerScreen(
                 ProfileScreen(
                     viewModel = hiltViewModel(),
                     onNavigateToAccountDetails = onNavigateToAccountDetails,
+                    onNavigateToAllBookings = {
+                        contentNavController.navigate("bookings") {
+                            popUpTo(contentNavController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onNavigateToUpcomingBookings =  { contentNavController.navigate("upcoming") },
                     onNavigateToSettings = onNavigateToSettings,
                     onNavigateToWishlist = onNavigateToWishlist,
                     onNavigateToRecentlyViewed = onNavigateToRecentlyViewed,
                     onSignOut = onSignOut
+                )
+            }
+
+            composable("upcoming"){
+                UpcomingBookingsScreen(
+                    onBookingDetailsClick = onNavigateToDetail,
+                    onNavigateBack = { contentNavController.popBackStack() }
                 )
             }
         }
@@ -474,6 +492,16 @@ private fun TabletContainerScreen(
                     ProfileScreen(
                         viewModel = hiltViewModel(),
                         onNavigateToAccountDetails = onNavigateToAccountDetails,
+                        onNavigateToAllBookings = {
+                            contentNavController.navigate("bookings") {
+                                popUpTo(contentNavController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        onNavigateToUpcomingBookings =  { contentNavController.navigate("upcoming") },
                         onNavigateToSettings = onNavigateToSettings,
                         onNavigateToRecentlyViewed = onNavigateToRecentlyViewed,
                         onNavigateToWishlist = onNavigateToWishlist,
@@ -525,6 +553,7 @@ private fun NavGraphBuilder.sharedAppGraph(
             onBookingDetailsClick = onNavigateToDetail
         )
     }
+
 }
 
 private data class SideNavItem(

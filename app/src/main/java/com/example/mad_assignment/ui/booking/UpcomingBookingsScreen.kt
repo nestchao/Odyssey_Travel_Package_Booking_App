@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -39,8 +40,9 @@ import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BookingsScreen(
-    onBookingDetailsClick: (String) -> Unit = {}
+fun UpcomingBookingsScreen(
+    onBookingDetailsClick: (String) -> Unit = {},
+    onNavigateBack: () -> Unit = {}
 ) {
     val viewModel: BookingViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -50,11 +52,19 @@ fun BookingsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Bookings",
+                        text = "Upcoming Bookings", // <-- Title Changed
                         style = MaterialTheme.typography.headlineMedium,
-                        fontSize = 32.sp,
+                        fontSize = 20.sp, // Adjusted size for longer title
                         fontWeight = FontWeight.Bold
                     )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
@@ -72,9 +82,6 @@ fun BookingsScreen(
                 is BookingUiState.Loading -> {
                     LoadingContent()
                 }
-                is BookingUiState.Empty -> {
-                    EmptyBookingsContent()
-                }
                 is BookingUiState.Error -> {
                     ErrorContent(
                         message = (uiState as BookingUiState.Error).message,
@@ -83,19 +90,25 @@ fun BookingsScreen(
                 }
                 is BookingUiState.Success -> {
                     val successState = uiState as BookingUiState.Success
-                    BookingsContent(
-                        state = successState,
-                        onBookingDetailsClick = { booking ->
-                            onBookingDetailsClick(booking.packageId)
-                        },
-                        onQuickViewClick = { bookingId ->
-                            viewModel.showBookingDetails(bookingId)
-                        },
-                        onCancelBooking = { bookingId ->
-                            viewModel.cancelBooking(bookingId)
-                        }
-                    )
 
+                    if (successState.upcomingBookings.isEmpty()) {
+                        EmptyUpcomingContent()
+                    } else {
+                        UpcomingBookingsContent(
+                            state = successState,
+                            onBookingDetailsClick = { booking ->
+                                onBookingDetailsClick(booking.packageId)
+                            },
+                            onQuickViewClick = { bookingId ->
+                                viewModel.showBookingDetails(bookingId)
+                            },
+                            onCancelBooking = { bookingId ->
+                                viewModel.cancelBooking(bookingId)
+                            }
+                        )
+                    }
+
+                    // Dialog logic remains the same
                     if (successState.showBookingDetails && successState.selectedBookingId != null) {
                         BookingDetailsDialog(
                             booking = successState.selectedBooking!!,
@@ -108,13 +121,21 @@ fun BookingsScreen(
                         )
                     }
                 }
+                // The original Empty state might mean "no bookings at all".
+                // We handle the "no upcoming bookings" case specifically above.
+                is BookingUiState.Empty -> {
+                    EmptyUpcomingContent()
+                }
             }
         }
     }
 }
 
+/**
+ * A simplified content composable that only displays a list of upcoming bookings.
+ */
 @Composable
-private fun BookingsContent(
+private fun UpcomingBookingsContent(
     state: BookingUiState.Success,
     onBookingDetailsClick: (Booking) -> Unit,
     onQuickViewClick: (String) -> Unit,
@@ -124,113 +145,60 @@ private fun BookingsContent(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
-        contentPadding = PaddingValues(vertical = 16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)
     ) {
-        // Current Bookings
-        if (state.hasCurrentBookings) {
-            item {
-                BookingSection(
-                    title = "Current",
-                    bookings = state.currentBookings,
-                    packages = state.packages,
-                    onBookingClick = onBookingDetailsClick,
-                    onQuickViewClick = onQuickViewClick,
-                    onCancelBooking = onCancelBooking,
-                    onViewAllClick = { /* Handle View All for current */ }
-                )
-            }
-        }
-
-        // Upcoming Bookings
-        if (state.hasUpcomingBookings) {
-            item {
-                BookingSection(
-                    title = "Upcoming",
-                    bookings = state.upcomingBookings,
-                    packages = state.packages,
-                    onBookingClick = onBookingDetailsClick,
-                    onQuickViewClick = onQuickViewClick,
-                    onCancelBooking = onCancelBooking,
-                    onViewAllClick = { /* Handle View All for upcoming */ }
-                )
-            }
-        }
-
-        // Past Bookings
-        if (state.hasPastBookings) {
-            item {
-                BookingSection(
-                    title = "Past",
-                    bookings = state.pastBookings.take(3), // Show only first 3 items
-                    packages = state.packages,
-                    onBookingClick = onBookingDetailsClick,
-                    onQuickViewClick = onQuickViewClick,
-                    onCancelBooking = onCancelBooking,
-                    onViewAllClick = { /* Handle View All for past */ },
-                    showViewAll = state.pastBookings.size > 3
-                )
-            }
-        }
-
-        item {
-            Spacer(modifier = Modifier.height(24.dp))
-        }
-    }
-}
-
-@Composable
-private fun BookingSection(
-    title: String,
-    bookings: List<Booking>,
-    packages: Map<String, TravelPackageWithImages?>,
-    onBookingClick: (Booking) -> Unit,
-    onQuickViewClick: (String) -> Unit,
-    onCancelBooking: (String) -> Unit,
-    onViewAllClick: () -> Unit,
-    showViewAll: Boolean = false
-) {
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground
+        items(state.upcomingBookings, key = { it.bookingId }) { booking ->
+            BookingCard(
+                booking = booking,
+                packageDetails = state.packages[booking.packageId],
+                onClick = { onBookingDetailsClick(booking) },
+                onQuickViewClick = { onQuickViewClick(booking.bookingId) },
+                onCancelBooking = { onCancelBooking(booking.bookingId) }
             )
-
-            if (showViewAll) {
-                Text(
-                    text = "View All →",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.clickable { onViewAllClick() }
-                )
-            }
-        }
-
-        Column(
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            bookings.forEach { booking ->
-                BookingCard(
-                    booking = booking,
-                    packageDetails = packages[booking.packageId],
-                    onClick = { onBookingClick(booking) },
-                    onQuickViewClick = { onQuickViewClick(booking.bookingId) },
-                    onCancelBooking = { onCancelBooking(booking.bookingId) }
-                )
-            }
         }
     }
 }
+
+/**
+ * A new empty state specific to having no UPCOMING bookings.
+ */
+@Composable
+private fun EmptyUpcomingContent() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                Icons.Outlined.EventBusy, // <-- More relevant icon
+                contentDescription = null,
+                modifier = Modifier.size(120.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = "No Upcoming Trips", // <-- Updated Title
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "You don't have any trips scheduled. Time to plan a new adventure!", // <-- Updated Message
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
 
 @Composable
 private fun BookingCard(
@@ -536,42 +504,6 @@ private fun LoadingContent() {
 }
 
 @Composable
-private fun EmptyBookingsContent() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                Icons.Outlined.BookmarkBorder,
-                contentDescription = null,
-                modifier = Modifier.size(120.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "No bookings yet",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Your travel bookings will appear here once you make a purchase",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-@Composable
 private fun ErrorContent(
     message: String,
     onRetry: () -> Unit
@@ -658,8 +590,3 @@ private fun formatDateRange(startDate: Timestamp, endDate: Timestamp): String {
     return "$startFormatted - $endFormatted $year"
 }
 
-// Extension function for timestamp formatting
-fun Timestamp.formatDate(): String {
-    val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
-    return sdf.format(this.toDate())
-}
