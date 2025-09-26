@@ -240,12 +240,22 @@ class CheckoutViewModel @Inject constructor(
             return Result.failure(Exception("Booking details are missing."))
         }
 
+        // Fetch package details again to get duration
+        val packageDetail = packageRepository.getPackageWithImages(packageId) ?: return Result.failure(Exception("Could not fetch package details for booking."))
+
         val decodedJson = URLDecoder.decode(paxCountsJson, "UTF-8")
         val type = object : TypeToken<Map<String, Int>>() {}.type
         val paxCounts: Map<String, Int> = Gson().fromJson(decodedJson, type)
 
         val state = _uiState.value as? CheckoutUiState.Success ?: return Result.failure(Exception("Invalid UI State"))
         val selectedDepartureTimestamp = state.displayItems.firstOrNull()?.departureDate ?: return Result.failure(Exception("Departure date not found."))
+
+        // *** FIX #1: CALCULATE THE CORRECT END DATE ***
+        val calendar = Calendar.getInstance()
+        calendar.time = selectedDepartureTimestamp.toDate()
+        // Subtract 1 because a 3-day trip is start date + 2 days
+        calendar.add(Calendar.DAY_OF_YEAR, packageDetail.travelPackage.durationDays - 1)
+        val endBookingDate = Timestamp(calendar.time)
 
         val noOfAdults = paxCounts["Adult"] ?: 0
         val noOfChildren = paxCounts["Child"] ?: 0
@@ -255,19 +265,21 @@ class CheckoutViewModel @Inject constructor(
             bookingId = UUID.randomUUID().toString(),
             userId = userId,
             packageId = packageId,
+            departureId = departureId,
             paymentId = paymentId,
             noOfAdults = noOfAdults,
             noOfChildren = noOfChildren,
             totalTravelerCount = totalTravelers,
             totalAmount = state.totalPrice,
-            subtotal = state.totalPrice,
+            subtotal = state.totalPrice, // You might have a different logic for subtotal vs total
             startBookingDate = selectedDepartureTimestamp,
-            endBookingDate = selectedDepartureTimestamp, // Note: You might need to calculate a proper end date
+            endBookingDate = endBookingDate, // Use the calculated end date
             createdAt = Timestamp.now(),
             updatedAt = Timestamp.now(),
             status = BookingStatus.PAID
         )
 
+        // This call will now work correctly because the newBooking object is complete
         return bookingRepository.createBookingFromDirectPurchase(newBooking, packageId, departureId, totalTravelers)
             .map { listOf(it) } // Wrap single ID in a list to match function signature
     }
