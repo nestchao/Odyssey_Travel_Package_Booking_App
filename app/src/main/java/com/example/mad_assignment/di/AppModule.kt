@@ -18,7 +18,7 @@ object AppModule {
     fun provideGenerativeModel(): GenerativeModel {
         return GenerativeModel(
             modelName = "gemini-2.5-flash",
-            apiKey = "AIzaSyBHs2iVHTfbsRKmv0U1kP92FLw9jxtTM94"
+            apiKey = "GOOGLE_API_KEY"
         )
     }
 
