@@ -1,5 +1,7 @@
 # Odyssey Travel Package Booking App
 
+![Project Screenshot](assets/Screenshot%202025-11-20%20190532.png)
+
 ## Description
 Odyssey is a modern Android application designed to simplify the travel booking experience. Built with **Jetpack Compose** and **Kotlin**, it allows users to explore curated travel packages, manage bookings, and plan their trips with ease. The app integrates **Google Gemini AI** for intelligent assistance and uses **Firebase** for a robust backend.
 
@@ -75,3 +77,13 @@ Contributions are welcome! Please follow these steps:
 
 ## License
 Distributed under the MIT License. See `LICENSE` for more information.
+
+## 📸 Screenshots
+
+![Screenshot 1](assets/Screenshot_20251121_121242.png)
+![Screenshot 2](assets/Screenshot_20251121_121327.png)
+![Screenshot 3](assets/Screenshot_20251121_121339.png)
+![Screenshot 3](assets/Screenshot_20251121_121357.png)
+![Screenshot 3](assets/Screenshot_20251121_121408.png)
+![Screenshot 3](assets/Screenshot_20251121_121419.png)
+![Screenshot 3](assets/Screenshot%202025-11-20%20190532.png)
